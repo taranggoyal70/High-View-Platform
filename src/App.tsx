@@ -14,6 +14,7 @@ import AnalyticsPage from './pages/AnalyticsPage'
 import CohortPage from './pages/CohortPage'
 import StudentProfilePage from './pages/StudentProfilePage'
 import OpportunitiesPage from './pages/OpportunitiesPage'
+import PrivacyPage from './pages/PrivacyPage'
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
         <Route path="/cohort" element={<CohortPage />} />
         <Route path="/cohort/:studentId" element={<StudentProfilePage />} />
         <Route path="/explore" element={<OpportunitiesPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         {/* Catch-all route for 404 */}
         <Route path="*" element={<HomePage />} />
       </Route>

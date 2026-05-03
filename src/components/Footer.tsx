@@ -18,7 +18,7 @@ const footerLinks = {
     { name: 'Support', href: '#' },
   ],
   legal: [
-    { name: 'Privacy', href: '#' },
+    { name: 'Privacy & Compliance', href: '/privacy' },
     { name: 'Terms', href: '#' },
   ],
 }
@@ -40,10 +40,10 @@ export default function Footer() {
           <div className="lg:col-span-2">
             <Link to="/" className="flex items-center gap-2 mb-4">
               <GraduationCap className="h-8 w-8 text-primary" />
-              <span className="text-xl font-bold text-white">HighView</span>
+              <span className="text-xl font-bold text-white">Studentlytics</span>
             </Link>
             <p className="text-slate-400 mb-6 max-w-sm">
-              Empowering education through AI-powered analytics and real-time insights for better student engagement.
+              AI attendance and engagement tracking for universities and cohort programs. Local processing, zero cloud dependency, FERPA compliant.
             </p>
             <div className="flex gap-4">
               {socialLinks.map((social) => (
@@ -131,7 +131,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-slate-400 text-sm">
-            © 2024 HighView. All rights reserved.
+            © 2026 Studentlytics. All rights reserved.
           </p>
           <p className="text-slate-400 text-sm">
             Made with ❤️ for better education
