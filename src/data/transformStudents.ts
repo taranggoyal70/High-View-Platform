@@ -1,4 +1,4 @@
-import studentsData from './students.json'
+import { studentsData } from './studentsData'
 
 export interface RealStudent {
   id: string
