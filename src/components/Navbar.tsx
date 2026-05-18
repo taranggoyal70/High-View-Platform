@@ -17,6 +17,7 @@ const staffNavItems = [
   { name: 'Leaderboard', href: '/leaderboard' },
   { name: 'Analytics', href: '/analytics' },
   { name: 'Cohort', href: '/cohort' },
+  { name: 'Opportunities', href: '/explore' },
   { name: 'Courses', href: '/courses' },
   { name: 'Sessions', href: '/sessions' },
 ]
