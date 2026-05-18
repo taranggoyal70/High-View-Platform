@@ -14,7 +14,6 @@ const staffNavItems = [
   { name: 'Home', href: '/' },
   { name: 'Dashboard', href: '/dashboard' },
   { name: 'Attendance', href: '/attendance' },
-  { name: 'Leaderboard', href: '/leaderboard' },
   { name: 'Analytics', href: '/analytics' },
   { name: 'Cohort', href: '/cohort' },
   { name: 'Opportunities', href: '/explore' },
