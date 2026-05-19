@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Search, MapPin, DollarSign, Users, Plus, X, Edit2 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 
@@ -74,11 +73,14 @@ const mockOpportunities: Opportunity[] = [
 const filterOptions = ['All', 'Job shadows', 'Micro-internships', 'Networking', 'Mentorship', 'Hackathons'] as const
 
 export default function OpportunitiesPage() {
-  const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<typeof filterOptions[number]>('All')
   const [userRole, setUserRole] = useState<'teacher' | 'student'>('student')
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities)
+  const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
+    // Load opportunities from localStorage or use mock data
+    const saved = localStorage.getItem('opportunities')
+    return saved ? JSON.parse(saved) : mockOpportunities
+  })
   const [modalOpen, setModalOpen] = useState(false)
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null)
   const [formData, setFormData] = useState<Partial<Opportunity>>({
@@ -101,6 +103,11 @@ export default function OpportunitiesPage() {
       setUserRole(user.type || 'student')
     }
   }, [])
+
+  // Save opportunities to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('opportunities', JSON.stringify(opportunities))
+  }, [opportunities])
 
   // Get filter options based on user role
   const availableFilters = userRole === 'student' 
@@ -144,7 +151,22 @@ export default function OpportunitiesPage() {
             <div className="ml-auto flex items-center gap-4">
               {userRole === 'teacher' && (
                 <Button 
-                  onClick={() => navigate('/opportunities/add')}
+                  onClick={() => {
+                    setEditingOpportunity(null)
+                    setFormData({
+                      title: '',
+                      company: '',
+                      type: 'Job shadows',
+                      tags: [],
+                      location: '',
+                      pay: '',
+                      duration: '',
+                      spots: 0,
+                      deadline: '',
+                      isPaid: false,
+                    })
+                    setModalOpen(true)
+                  }}
                   className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
                 >
                   <Plus className="h-4 w-4 mr-2" />
