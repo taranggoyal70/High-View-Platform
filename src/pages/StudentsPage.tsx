@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Search, Plus, Eye, Mail, BarChart3, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react'
+import { Search, Plus, Eye, Mail, BarChart3, ChevronLeft, ChevronRight, ArrowUpDown, X } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 import { useState, useEffect } from 'react'
@@ -48,9 +48,17 @@ export default function StudentsPage() {
   const [filterClass, setFilterClass] = useState('all')
   const [apiStudents, setApiStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [sortColumn, setSortColumn] = useState<'student_id' | 'student_name' | 'class_name' | 'attendance' | 'engagement' | null>(null)
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [error, setError] = useState<string | null>(null)
+  const [sortColumn, setSortColumn] = useState<'student_id' | 'student_name' | 'class_name' | 'attendance' | 'engagement'>('student_name')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [addStudentModalOpen, setAddStudentModalOpen] = useState(false)
+  const [newStudentForm, setNewStudentForm] = useState({
+    id: '',
+    name: '',
+    email: '',
+    class_id: '',
+    class_name: ''
+  })
 
   // Fetch students from API on component mount
   useEffect(() => {
@@ -175,21 +183,33 @@ export default function StudentsPage() {
   // Handler for adding a new student
   const handleAddStudent = async () => {
     try {
-      const newStudent = {
-        id: "S124",
-        name: "Alice Johnson",
-        email: "alice@university.edu",
-        class_id: "COEN233",
-        class_name: "Networking"
+      // Validate form
+      if (!newStudentForm.id || !newStudentForm.name || !newStudentForm.email) {
+        alert('Please fill in all required fields (ID, Name, Email)')
+        return
       }
-      const result = await addStudent(newStudent)
+
+      const result = await addStudent(newStudentForm)
       console.log('Student added:', result)
+      
       // Refresh the student list
       const data = await getAllStudents()
       setApiStudents(data)
+      
+      // Close modal and reset form
+      setAddStudentModalOpen(false)
+      setNewStudentForm({
+        id: '',
+        name: '',
+        email: '',
+        class_id: '',
+        class_name: ''
+      })
+      
+      alert('Student added successfully!')
     } catch (err) {
       console.error('Error adding student:', err)
-      alert('Failed to add student')
+      alert('Failed to add student. Please try again.')
     }
   }
 
@@ -206,29 +226,30 @@ export default function StudentsPage() {
   }
 
   const filteredStudents = allStudents.filter((student: any) => {
-    const name = student.student_name || student.name || ''
-    const id = student.student_id || student.id || ''
-    const className = student.class_name || student.class || ''
+    const matchesSearch = 
+      (student.student_name || student.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (student.student_id || student.id || '').toLowerCase().includes(searchTerm.toLowerCase())
     
-    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesClass = filterClass === 'all' || className === filterClass
+    const matchesClass = filterClass === 'all' || 
+      (student.class_name || student.class || '').toLowerCase() === filterClass.toLowerCase()
+    
     return matchesSearch && matchesClass
-  }).sort((a, b) => {
-    if (!sortColumn) return 0
+  }).sort((a: any, b: any) => {
+    let aVal: any, bVal: any
     
-    let aVal: any = a[sortColumn] || ''
-    let bVal: any = b[sortColumn] || ''
+    // Use the actual field names from the data
+    aVal = a[sortColumn] || ''
+    bVal = b[sortColumn] || ''
     
-    // Handle string comparison
     if (typeof aVal === 'string') {
-      aVal = aVal.toLowerCase()
-      bVal = bVal.toLowerCase()
+      return sortDirection === 'asc' 
+        ? aVal.localeCompare(bVal)
+        : bVal.localeCompare(aVal)
+    } else {
+      return sortDirection === 'asc'
+        ? aVal - bVal
+        : bVal - aVal
     }
-    
-    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
-    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
-    return 0
   })
 
   return (
@@ -247,7 +268,7 @@ export default function StudentsPage() {
                 Manage and track student information and performance
               </p>
             </div>
-            <Button className="gap-2" onClick={handleAddStudent}>
+            <Button className="gap-2" onClick={() => setAddStudentModalOpen(true)}>
               <Plus className="h-4 w-4" />
               Add Student
             </Button>
@@ -470,6 +491,123 @@ export default function StudentsPage() {
 
         </motion.div>
       </div>
+
+      {/* Add Student Modal */}
+      {addStudentModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden"
+          >
+            <div className="p-6 border-b">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold">Add New Student</h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setAddStudentModalOpen(false)
+                    setNewStudentForm({
+                      id: '',
+                      name: '',
+                      email: '',
+                      class_id: '',
+                      class_name: ''
+                    })
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Student ID *</label>
+                <input
+                  type="text"
+                  required
+                  value={newStudentForm.id}
+                  onChange={(e) => setNewStudentForm({ ...newStudentForm, id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., S124"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={newStudentForm.name}
+                  onChange={(e) => setNewStudentForm({ ...newStudentForm, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Alice Johnson"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input
+                  type="email"
+                  required
+                  value={newStudentForm.email}
+                  onChange={(e) => setNewStudentForm({ ...newStudentForm, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., alice@university.edu"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Class ID</label>
+                <input
+                  type="text"
+                  value={newStudentForm.class_id}
+                  onChange={(e) => setNewStudentForm({ ...newStudentForm, class_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., COEN233"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Class Name</label>
+                <input
+                  type="text"
+                  value={newStudentForm.class_name}
+                  onChange={(e) => setNewStudentForm({ ...newStudentForm, class_name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Networking"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t bg-muted/30 flex gap-3">
+              <Button
+                onClick={handleAddStudent}
+                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+              >
+                Add Student
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAddStudentModalOpen(false)
+                  setNewStudentForm({
+                    id: '',
+                    name: '',
+                    email: '',
+                    class_id: '',
+                    class_name: ''
+                  })
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   )
 }
