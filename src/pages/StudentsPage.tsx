@@ -3,7 +3,6 @@ import { Search, Plus, Eye, Mail, BarChart3, ChevronLeft, ChevronRight, ArrowUpD
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 import { useState, useEffect } from 'react'
-import { getAllStudents, addStudent } from '../services/api'
 import { realStudents } from '../data/transformStudents'
 
 // Load CSV data
@@ -60,12 +59,17 @@ export default function StudentsPage() {
     class_name: ''
   })
 
-  // Fetch students from API on component mount
+  // Fetch students from localStorage on component mount
   useEffect(() => {
     const fetchStudents = async () => {
       try {
         setLoading(true)
-        // Use real student data from students.json
+        
+        // Load custom students from localStorage
+        const savedStudents = localStorage.getItem('customStudents')
+        const customStudents = savedStudents ? JSON.parse(savedStudents) : []
+        
+        // Use real student data from students.json as base
         const transformedStudents = realStudents.map(student => ({
           student_id: student.id,
           student_name: student.name,
@@ -82,8 +86,11 @@ export default function StudentsPage() {
           speaking_time: Math.round(student.sessionsAttended * 10),
           record_id: `${student.id}_${student.name.replace(/\s/g, '_')}`
         }))
-        console.log('Loaded real students:', transformedStudents)
-        setApiStudents(transformedStudents)
+        
+        // Combine with custom students
+        const allStudents = [...transformedStudents, ...customStudents]
+        console.log('Loaded students:', allStudents)
+        setApiStudents(allStudents)
         setError(null)
       } catch (err) {
         console.error('Error loading students:', err)
@@ -189,12 +196,37 @@ export default function StudentsPage() {
         return
       }
 
-      const result = await addStudent(newStudentForm)
-      console.log('Student added:', result)
+      // Create new student object
+      const newStudent = {
+        student_id: newStudentForm.id,
+        student_name: newStudentForm.name,
+        student_email: newStudentForm.email,
+        class_name: newStudentForm.class_name || 'Not Assigned',
+        attendance: 0,
+        engagement: 0,
+        grade: 0,
+        teacher_name: 'HighView Staff',
+        session_date: new Date().toISOString().split('T')[0],
+        photo_url: '👨‍🎓',
+        department: 'New Student',
+        topic: 'Current Cohort',
+        speaking_time: 0,
+        record_id: `${newStudentForm.id}_${newStudentForm.name.replace(/\s/g, '_')}`
+      }
+
+      // Load existing custom students from localStorage
+      const savedStudents = localStorage.getItem('customStudents')
+      const customStudents = savedStudents ? JSON.parse(savedStudents) : []
       
-      // Refresh the student list
-      const data = await getAllStudents()
-      setApiStudents(data)
+      // Add new student
+      customStudents.push(newStudent)
+      
+      // Save to localStorage
+      localStorage.setItem('customStudents', JSON.stringify(customStudents))
+      console.log('Student added to localStorage:', newStudent)
+      
+      // Update UI by adding to current list
+      setApiStudents(prev => [...prev, newStudent])
       
       // Close modal and reset form
       setAddStudentModalOpen(false)
