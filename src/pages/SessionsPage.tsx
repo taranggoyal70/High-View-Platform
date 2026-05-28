@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Calendar, Clock, Video, Upload, X, CheckCircle, Loader2, Users, Brain, AlertCircle, CalendarPlus, ChevronDown, UserCheck, UserPlus, Edit, Trash2, BarChart3, Activity } from 'lucide-react'
+import { Calendar, Clock, Video, Upload, X, CheckCircle, Loader2, Users, Brain, AlertCircle, CalendarPlus, ChevronDown, UserCheck, UserPlus, Edit, Trash2, BarChart3, Activity, ShieldAlert, GraduationCap } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { videoService, VideoUploadProgress, VideoAnalysisResult } from '../services/videoService'
@@ -62,6 +62,7 @@ export default function SessionsPage() {
     return saved ? JSON.parse(saved) : {}
   })
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [studentClassYear, setStudentClassYear] = useState<string>('')
   const [registeredStudentsModalOpen, setRegisteredStudentsModalOpen] = useState(false)
   const [selectedSessionForView, setSelectedSessionForView] = useState<Session | null>(null)
 
@@ -89,6 +90,7 @@ export default function SessionsPage() {
         instructor: 'HighView Staff',
         enrolled,
         rsvps,
+        requiredGrades: [] as string[],
       }
     })
 
@@ -211,6 +213,13 @@ export default function SessionsPage() {
       setCurrentUser(user)
       setUserRole(user.type || 'student')
     }
+    try {
+      const profileData = localStorage.getItem('studentProfileData')
+      if (profileData) {
+        const parsed = JSON.parse(profileData)
+        setStudentClassYear(parsed.classYear || '')
+      }
+    } catch { /* ignore */ }
 
     videoService.getAllVideos().then((videos) => {
       setProcessedVideos(videos.filter((v) => v.processingStatus === 'completed'))
@@ -310,149 +319,185 @@ export default function SessionsPage() {
           {userRole === 'student' ? 'Upcoming learning sessions and workshops' : 'Manage sessions and track attendance'}
         </p>
 
-        {/* STUDENT VIEW - Live Sessions Table */}
-        {userRole === 'student' && (
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-6">Live Sessions</h2>
-            <div className="space-y-6">
-              {sessions.map((session, index) => (
-                <motion.div
-                  key={session.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                >
-                  <Card className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-xl mb-2">{session.title}</CardTitle>
-                          <CardDescription>Instructor: {session.instructor}</CardDescription>
-                        </div>
-                        <span className="px-3 py-1 text-xs font-medium rounded-full bg-primary/10 text-primary">
-                          {session.type}
-                        </span>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap items-center gap-6 mb-4">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calendar className="h-4 w-4" />
-                          <span>{session.date}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          <span>{session.time}</span>
-                        </div>
-                        {session.type === 'Virtual' && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Video className="h-4 w-4" />
-                            <span>Online Session</span>
-                          </div>
+        {/* STUDENT VIEW */}
+        {userRole === 'student' && (() => {
+          const isMandatoryForMe = (s: Session) =>
+            !!s.requiredGrades?.length && !!studentClassYear && s.requiredGrades.includes(studentClassYear)
+
+          const mandatorySessions = sessions.filter(isMandatoryForMe)
+          const otherSessions = sessions.filter(s => !isMandatoryForMe(s))
+
+          const SessionCard = ({ session, index, mandatory }: { session: Session; index: number; mandatory: boolean }) => (
+            <motion.div
+              key={session.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+            >
+              <Card className={`hover:shadow-lg transition-shadow ${mandatory ? 'border-l-4 border-l-red-500' : ''}`}>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <CardTitle className="text-xl">{session.title}</CardTitle>
+                        {mandatory && (
+                          <span className="flex items-center gap-1 px-2.5 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+                            <ShieldAlert className="h-3 w-3" />
+                            Mandatory for you
+                          </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{getRegistrationCount(session.id)}</span>
-                          <span className="text-muted-foreground">registered</span>
-                        </div>
+                      <CardDescription>Instructor: {session.instructor}</CardDescription>
+                    </div>
+                    <span className="px-3 py-1 text-xs font-medium rounded-full bg-primary/10 text-primary shrink-0">
+                      {session.type}
+                    </span>
+                  </div>
+
+                  {/* Required grade tags */}
+                  {!!session.requiredGrades?.length && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <GraduationCap className="h-3.5 w-3.5" />
+                        Required for:
+                      </span>
+                      {session.requiredGrades.map(g => (
+                        <span key={g}
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            g === studentClassYear
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                          {g}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap items-center gap-6 mb-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="h-4 w-4" />
+                      <span>{session.date}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span>{session.time}</span>
+                    </div>
+                    {session.type === 'Virtual' && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Video className="h-4 w-4" />
+                        <span>Online Session</span>
                       </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          variant={isRegistered(session.id) ? "outline" : "default"}
-                          onClick={() => handleRegisterForSession(session.id)}
-                          className="flex items-center gap-2"
-                        >
-                          {isRegistered(session.id) ? (
-                            <>
-                              <UserCheck className="h-4 w-4" />
-                              Registered
-                            </>
-                          ) : (
-                            <>
-                              <UserPlus className="h-4 w-4" />
-                              Register
-                            </>
-                          )}
-                        </Button>
-                        <Button size="sm" variant="outline" className="flex items-center gap-2">
-                          <Video className="h-4 w-4" />
-                          Join Session
-                        </Button>
-                        
-                        {/* Add to Calendar Dropdown */}
-                        <div className="relative">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setCalendarDropdownOpen(calendarDropdownOpen === session.id ? null : session.id)}
-                            className="flex items-center gap-2"
-                          >
-                            <CalendarPlus className="h-4 w-4" />
-                            Add to Calendar
-                            <ChevronDown className="h-3 w-3" />
-                          </Button>
-                          
-                          {calendarDropdownOpen === session.id && (
-                            <>
-                              {/* Backdrop to close dropdown */}
-                              <div 
-                                className="fixed inset-0 z-10" 
-                                onClick={() => setCalendarDropdownOpen(null)}
-                              />
-                              
-                              {/* Dropdown Menu */}
-                              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                                <button
-                                  onClick={() => {
-                                    addToCalendar({
-                                      title: session.title,
-                                      description: `Join us for ${session.title}`,
-                                      location: session.type === 'Virtual' ? 'Online (Link will be provided)' : 'Campus',
-                                      startDate: session.date,
-                                      startTime: session.time.split(' - ')[0],
-                                      endTime: session.time.split(' - ')[1],
-                                      instructor: session.instructor,
-                                    }, 'google')
-                                    setCalendarDropdownOpen(null)
-                                  }}
-                                  className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                                >
-                                  <Calendar className="h-4 w-4" />
-                                  Google Calendar
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    addToCalendar({
-                                      title: session.title,
-                                      description: `Join us for ${session.title}`,
-                                      location: session.type === 'Virtual' ? 'Online (Link will be provided)' : 'Campus',
-                                      startDate: session.date,
-                                      startTime: session.time.split(' - ')[0],
-                                      endTime: session.time.split(' - ')[1],
-                                      instructor: session.instructor,
-                                    }, 'ics')
-                                    setCalendarDropdownOpen(null)
-                                  }}
-                                  className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                                >
-                                  <CalendarPlus className="h-4 w-4" />
-                                  Download ICS
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
+                    )}
+                    <div className="flex items-center gap-2 text-sm">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{getRegistrationCount(session.id)}</span>
+                      <span className="text-muted-foreground">registered</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant={isRegistered(session.id) ? 'outline' : 'default'}
+                      onClick={() => handleRegisterForSession(session.id)}
+                      className="flex items-center gap-2"
+                    >
+                      {isRegistered(session.id) ? (
+                        <><UserCheck className="h-4 w-4" />Registered</>
+                      ) : (
+                        <><UserPlus className="h-4 w-4" />Register</>
+                      )}
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex items-center gap-2">
+                      <Video className="h-4 w-4" />
+                      Join Session
+                    </Button>
+                    {/* Add to Calendar Dropdown */}
+                    <div className="relative">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setCalendarDropdownOpen(calendarDropdownOpen === session.id ? null : session.id)}
+                        className="flex items-center gap-2"
+                      >
+                        <CalendarPlus className="h-4 w-4" />
+                        Add to Calendar
+                        <ChevronDown className="h-3 w-3" />
+                      </Button>
+                      {calendarDropdownOpen === session.id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setCalendarDropdownOpen(null)} />
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                            <button
+                              onClick={() => { addToCalendar({ title: session.title, description: `Join us for ${session.title}`, location: session.type === 'Virtual' ? 'Online (Link will be provided)' : 'Campus', startDate: session.date, startTime: session.time.split(' - ')[0], endTime: session.time.split(' - ')[1], instructor: session.instructor }, 'google'); setCalendarDropdownOpen(null) }}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2 text-sm"
+                            >
+                              <Calendar className="h-4 w-4" />Google Calendar
+                            </button>
+                            <button
+                              onClick={() => { addToCalendar({ title: session.title, description: `Join us for ${session.title}`, location: session.type === 'Virtual' ? 'Online (Link will be provided)' : 'Campus', startDate: session.date, startTime: session.time.split(' - ')[0], endTime: session.time.split(' - ')[1], instructor: session.instructor }, 'ics'); setCalendarDropdownOpen(null) }}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2 text-sm"
+                            >
+                              <CalendarPlus className="h-4 w-4" />Download ICS
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )
+
+          return (
+            <div className="mb-12 space-y-10">
+              {/* Mandatory for you */}
+              {mandatorySessions.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                    <ShieldAlert className="h-5 w-5 text-red-500" />
+                    <h2 className="text-2xl font-bold">Required for You</h2>
+                    {studentClassYear && (
+                      <span className="px-2.5 py-0.5 bg-red-100 text-red-700 text-sm font-medium rounded-full">
+                        {studentClassYear}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-5">
+                    These sessions are mandatory for your grade level. Make sure to register and attend.
+                  </p>
+                  <div className="space-y-5">
+                    {mandatorySessions.map((s, i) => <SessionCard key={s.id} session={s} index={i} mandatory />)}
+                  </div>
+                </section>
+              )}
+
+              {/* No class year set */}
+              {!studentClassYear && sessions.some(s => s.requiredGrades?.length) && (
+                <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+                  <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                  <span>Set your class year in <strong>My Profile</strong> to see which sessions are mandatory for you.</span>
+                </div>
+              )}
+
+              {/* All other sessions */}
+              <section>
+                <h2 className="text-2xl font-bold mb-5">
+                  {mandatorySessions.length > 0 ? 'All Other Sessions' : 'All Sessions'}
+                </h2>
+                {otherSessions.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">No additional sessions scheduled.</p>
+                ) : (
+                  <div className="space-y-5">
+                    {otherSessions.map((s, i) => <SessionCard key={s.id} session={s} index={i} mandatory={false} />)}
+                  </div>
+                )}
+              </section>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* STAFF VIEW - Manage RSVPs Table */}
         {userRole === 'staff' && (
