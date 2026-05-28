@@ -6,8 +6,8 @@ import FeaturesSection from '../components/FeaturesSection'
 import StatsSection from '../components/StatsSection'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
-import { BarChart3, Users, TrendingUp, Clock, Award, Target, MessageCircle, X, Briefcase, Calendar } from 'lucide-react'
-import { realStudents } from '../data/transformStudents'
+import { TrendingUp, Clock, Award, Target, MessageCircle, X, Briefcase, Calendar } from 'lucide-react'
+import CohortPage from './CohortPage'
 
 // FAQ Responses
 const FAQ_RESPONSES: Record<string, string> = {
@@ -400,98 +400,10 @@ export default function HomePage() {
   // Teacher Dashboard
   if (userRole === 'staff') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-8">
-        <div className="container mx-auto px-4">
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8"
-          >
-            <h1 className="text-4xl font-bold mb-2">Staff Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back, {user?.name}! Here's an overview of your cohort.</p>
-          </motion.div>
-
-          {/* Real student count stat */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Total Students</p>
-                    <p className="text-3xl font-bold">{realStudents.length}</p>
-                    <p className="text-xs text-muted-foreground mt-1">2026-27 College Cohort</p>
-                  </div>
-                  <div className="bg-blue-50 p-3 rounded-full">
-                    <Users className="h-6 w-6 text-blue-600" />
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Avg Attendance</p>
-                    <p className="text-3xl font-bold">—</p>
-                    <p className="text-xs text-muted-foreground mt-1">Available after sessions start</p>
-                  </div>
-                  <div className="bg-purple-50 p-3 rounded-full">
-                    <Clock className="h-6 w-6 text-purple-600" />
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Avg Engagement</p>
-                    <p className="text-3xl font-bold">—</p>
-                    <p className="text-xs text-muted-foreground mt-1">Available after sessions start</p>
-                  </div>
-                  <div className="bg-green-50 p-3 rounded-full">
-                    <TrendingUp className="h-6 w-6 text-green-600" />
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          </div>
-
-          {/* Link to full student list */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <Card className="p-6">
-              <h3 className="text-xl font-semibold mb-2 flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                HighView Cohort
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {realStudents.length} students enrolled. Class sessions have not started yet — attendance and engagement data will populate once recordings are processed.
-              </p>
-              <Link to="/students">
-                <Button>View All Students</Button>
-              </Link>
-            </Card>
-          </motion.div>
-        </div>
+      <>
+        <CohortPage />
         <TeacherAIChatbot />
-      </div>
+      </>
     )
   }
 
