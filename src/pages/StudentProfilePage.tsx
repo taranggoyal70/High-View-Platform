@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Brain, BookOpen, Calendar, Mail, GraduationCap, Clock } from 'lucide-react'
+import { ArrowLeft, Brain, BookOpen, Calendar, Mail, GraduationCap, Clock, Pencil, X, Check } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 import { cohortStudents } from '../data/transformStudents'
@@ -79,25 +79,43 @@ function getLetterGrade(grade: number): string {
   return 'F'
 }
 
+interface ProgressOverride {
+  ai: number
+  experiential: number
+  sessionAttendance: number
+}
+
 export default function StudentProfilePage() {
   const { studentId } = useParams<{ studentId: string }>()
   const navigate = useNavigate()
   const [student, setStudent] = useState<StudentRecord | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isStaff, setIsStaff] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [overrides, setOverrides] = useState<ProgressOverride | null>(null)
+  const [editValues, setEditValues] = useState<ProgressOverride>({ ai: 0, experiential: 0, sessionAttendance: 0 })
 
   useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    setIsStaff(user?.role === 'staff')
+
     // Use real student data from students.json
     const realStudent = cohortStudents.find(s => s.id === studentId)
     if (realStudent) {
+      // Load any manual overrides from localStorage
+      const savedOverrides = localStorage.getItem(`progress_overrides_${studentId}`)
+      const parsed: ProgressOverride | null = savedOverrides ? JSON.parse(savedOverrides) : null
+      setOverrides(parsed)
+
       // Transform to StudentRecord format
       const studentRecord: StudentRecord = {
         student_id: realStudent.id,
         student_name: realStudent.name,
         student_email: realStudent.email,
         class_name: realStudent.major,
-        attendance: realStudent.sessionAttendance,
-        engagement: realStudent.ai,
-        grade: realStudent.experiential,
+        attendance: parsed?.sessionAttendance ?? realStudent.sessionAttendance,
+        engagement: parsed?.ai ?? realStudent.ai,
+        grade: parsed?.experiential ?? realStudent.experiential,
         teacher_name: 'HighView Staff',
         session_date: '2026-09-01',
         photo_url: `https://ui-avatars.com/api/?name=${realStudent.name.replace(' ', '+')}&background=random`,
@@ -107,11 +125,29 @@ export default function StudentProfilePage() {
         record_id: realStudent.id
       }
       setStudent(studentRecord)
+      setEditValues({
+        ai: parsed?.ai ?? realStudent.ai,
+        experiential: parsed?.experiential ?? realStudent.experiential,
+        sessionAttendance: parsed?.sessionAttendance ?? realStudent.sessionAttendance,
+      })
     } else {
       setStudent(null)
     }
     setLoading(false)
   }, [studentId])
+
+  function saveProgressOverrides() {
+    if (!student) return
+    const clamped: ProgressOverride = {
+      ai: Math.min(100, Math.max(0, editValues.ai)),
+      experiential: Math.min(100, Math.max(0, editValues.experiential)),
+      sessionAttendance: Math.min(100, Math.max(0, editValues.sessionAttendance)),
+    }
+    localStorage.setItem(`progress_overrides_${studentId}`, JSON.stringify(clamped))
+    setOverrides(clamped)
+    setStudent(prev => prev ? { ...prev, engagement: clamped.ai, grade: clamped.experiential, attendance: clamped.sessionAttendance } : prev)
+    setEditOpen(false)
+  }
 
   if (loading) {
     return (
@@ -233,18 +269,68 @@ export default function StudentProfilePage() {
 
           {/* Pillar Progress */}
           <Card className="p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-6">Pillar Progress</h2>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold">Pillar Progress</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Scores are out of 100. {overrides ? 'Values have been manually updated.' : 'Values reflect latest data.'}</p>
+              </div>
+              {isStaff && (
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(v => !v)} className="gap-2">
+                  {editOpen ? <><X className="h-4 w-4" /> Cancel</> : <><Pencil className="h-4 w-4" /> Edit Progress</>}
+                </Button>
+              )}
+            </div>
+
+            {/* Manual edit form (staff only) */}
+            {editOpen && (
+              <div className="mb-6 p-4 bg-muted/40 border rounded-xl">
+                <p className="text-sm font-medium mb-4">Manually update pillar scores (0–100)</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">AI Learning</label>
+                    <input
+                      type="number" min={0} max={100}
+                      value={editValues.ai}
+                      onChange={e => setEditValues(v => ({ ...v, ai: Number(e.target.value) }))}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Experiential Learning</label>
+                    <input
+                      type="number" min={0} max={100}
+                      value={editValues.experiential}
+                      onChange={e => setEditValues(v => ({ ...v, experiential: Number(e.target.value) }))}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Session Attendance</label>
+                    <input
+                      type="number" min={0} max={100}
+                      value={editValues.sessionAttendance}
+                      onChange={e => setEditValues(v => ({ ...v, sessionAttendance: Number(e.target.value) }))}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                    />
+                  </div>
+                </div>
+                <Button onClick={saveProgressOverrides} size="sm" className="mt-4 gap-2">
+                  <Check className="h-4 w-4" /> Save Changes
+                </Button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="p-5 border rounded-xl">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 bg-purple-100 rounded-lg">
                     <Brain className="h-5 w-5 text-purple-600" />
                   </div>
-                  <span className="font-semibold">AI</span>
+                  <span className="font-semibold">AI Learning</span>
                 </div>
                 <div className="text-3xl font-bold mb-1">{aiScore}%</div>
-                <p className="text-xs text-muted-foreground mb-3">Engagement score</p>
-                <div className="w-full bg-secondary rounded-full h-2">
+                <p className="text-xs text-muted-foreground mb-1">Participation in AI-assisted learning tools and digital engagement sessions</p>
+                <div className="w-full bg-secondary rounded-full h-2 mt-3">
                   <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${aiScore}%` }} />
                 </div>
               </div>
@@ -257,8 +343,8 @@ export default function StudentProfilePage() {
                   <span className="font-semibold">Experiential Learning</span>
                 </div>
                 <div className="text-3xl font-bold mb-1">{experientialScore}%</div>
-                <p className="text-xs text-muted-foreground mb-3">Grade performance</p>
-                <div className="w-full bg-secondary rounded-full h-2">
+                <p className="text-xs text-muted-foreground mb-1">Events attended, job shadows, mentorship sessions, and internship applications submitted</p>
+                <div className="w-full bg-secondary rounded-full h-2 mt-3">
                   <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${experientialScore}%` }} />
                 </div>
               </div>
@@ -271,8 +357,8 @@ export default function StudentProfilePage() {
                   <span className="font-semibold">Session Attendance</span>
                 </div>
                 <div className="text-3xl font-bold mb-1">{sessionAttendance}%</div>
-                <p className="text-xs text-muted-foreground mb-3">Attendance rate</p>
-                <div className="w-full bg-secondary rounded-full h-2">
+                <p className="text-xs text-muted-foreground mb-1">Percentage of scheduled cohort sessions attended (sessions attended ÷ total sessions)</p>
+                <div className="w-full bg-secondary rounded-full h-2 mt-3">
                   <div className="bg-green-500 h-2 rounded-full" style={{ width: `${sessionAttendance}%` }} />
                 </div>
               </div>
