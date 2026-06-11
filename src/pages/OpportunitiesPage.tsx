@@ -226,7 +226,7 @@ export default function OpportunitiesPage() {
         {/* Results Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-gray-900">
-            Open now <span className="text-gray-500 font-normal">{openCount} opportunities</span>
+            Open Now <span className="text-gray-500 font-normal">{openCount} opportunities</span>
           </h2>
           <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
             Sort: Deadline ↓

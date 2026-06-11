@@ -319,7 +319,7 @@ export default function CohortPage() {
           {/* ── Header ── */}
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl font-bold">Cohort overview</h1>
+              <h1 className="text-2xl font-bold">Cohort Overview</h1>
               <p className="text-sm text-gray-500 mt-1">
                 {semester} · {totalStudents} students · Greater Denver
               </p>
@@ -498,7 +498,7 @@ export default function CohortPage() {
           {/* ── Alerts & follow-ups ── */}
           <div className="border rounded-xl p-6 mb-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Alerts & follow-ups</h2>
+              <h2 className="text-lg font-bold">Alerts & Follow-Ups</h2>
               <span className="text-sm text-gray-400">{ALERTS.length} flagged</span>
             </div>
             <div className="divide-y">
@@ -522,7 +522,7 @@ export default function CohortPage() {
           <div className="border rounded-xl overflow-hidden">
             {/* Roster Header */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 p-5 border-b">
-              <h2 className="text-lg font-bold">Student roster</h2>
+              <h2 className="text-lg font-bold">Student Roster</h2>
               <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                 <div className="relative flex-1 md:flex-none">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
