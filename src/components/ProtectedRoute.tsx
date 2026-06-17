@@ -21,7 +21,6 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 
   // If no role or role not allowed, redirect immediately
   if (!userRole || !allowedRoles.includes(userRole as any)) {
-    console.log(`Access denied: User role "${userRole}" not in allowed roles:`, allowedRoles)
     return <Navigate to="/" replace />
   }
 

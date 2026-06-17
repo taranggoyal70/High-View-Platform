@@ -20,6 +20,7 @@ import PrivacyPage from './pages/PrivacyPage'
 import ProfilePage from './pages/ProfilePage'
 import AttendanceTrackingPage from './pages/AttendanceTrackingPage'
 import AddOpportunityPage from './pages/AddOpportunityPage'
+import NotFoundPage from './pages/NotFoundPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -75,8 +76,7 @@ function App() {
             <AddOpportunityPage />
           </ProtectedRoute>
         } />
-        {/* Catch-all route for 404 */}
-        <Route path="*" element={<HomePage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   )

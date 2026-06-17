@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: process.env.VITE_API_TARGET || 'https://d25zzadgyf.execute-api.us-east-1.amazonaws.com',
+        target: process.env.VITE_API_TARGET ?? '',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '/prod'),
         configure: (proxy) => {
