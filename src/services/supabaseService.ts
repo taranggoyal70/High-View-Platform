@@ -530,3 +530,64 @@ export async function setCourseRegistration(userId: string, courseId: string, en
     if (error) throw new Error(error.message)
   }
 }
+
+// ── Students ──────────────────────────────────────────────────────────────────
+
+export interface StudentRecord {
+  id: string
+  name: string
+  email: string
+  phone: string
+  university: string
+  major: string
+  expected_graduation: number
+  cohort: string
+  enrollment_date: string
+  status: string
+  attendance_rate: number
+  engagement_score: number
+  sessions_attended: number
+  total_sessions: number
+  gpa: number
+  picture: string
+}
+
+export interface SemesterStat {
+  student_id: string
+  student_name: string
+  engagement_score: number
+  attendance_rate: number
+  participation_points: number
+  total_points: number
+  semester: string
+  previous_semester_score: number | null
+}
+
+export async function getStudents(): Promise<StudentRecord[]> {
+  const { data, error } = await supabase
+    .from('students')
+    .select('*')
+    .order('name', { ascending: true })
+  if (error || !data) return []
+  return data as StudentRecord[]
+}
+
+export async function addStudentRecord(student: Omit<StudentRecord, never>): Promise<StudentRecord> {
+  const { data, error } = await supabase
+    .from('students')
+    .upsert(student, { onConflict: 'id' })
+    .select()
+    .single()
+  if (error || !data) throw new Error(error?.message ?? 'Failed to add student')
+  return data as StudentRecord
+}
+
+export async function getStudentSemesterStats(semesterId: string): Promise<SemesterStat[]> {
+  const { data, error } = await supabase
+    .from('student_semester_stats')
+    .select('*')
+    .eq('semester', semesterId)
+    .order('total_points', { ascending: false })
+  if (error || !data) return []
+  return data as SemesterStat[]
+}

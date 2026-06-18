@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { realStudents } from '../data/transformStudents'
+import { getStudents, addStudentRecord } from '../services/supabaseService'
 
 
 const getStatusColor = (attendance: number) => {
@@ -33,67 +33,36 @@ export default function StudentsPage() {
     class_name: ''
   })
 
-  // Fetch students from localStorage on component mount
+  // Fetch students from Supabase
   useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        setLoading(true)
-        
-        // Load custom students from localStorage
-        const savedStudents = localStorage.getItem('customStudents')
-        const customStudents = savedStudents ? JSON.parse(savedStudents) : []
-        
-        // Use real student data from students.json as base
-        const transformedStudents = realStudents.map(student => ({
-          student_id: student.id,
-          student_name: student.name,
-          student_email: student.email,
-          class_name: student.major,
-          attendance: student.attendanceRate,
-          engagement: student.engagementScore,
-          grade: Math.round(student.gpa * 25), // Convert GPA to percentage
-          teacher_name: 'HighView Staff',
-          session_date: student.enrollmentDate,
-          photo_url: student.picture,
-          department: student.university,
-          topic: student.cohort,
-          speaking_time: Math.round(student.sessionsAttended * 10),
-          record_id: `${student.id}_${student.name.replace(/\s/g, '_')}`
-        }))
-        
-        // Combine with custom students
-        const allStudents = [...transformedStudents, ...customStudents]
-        setApiStudents(allStudents)
-        setError(null)
-      } catch {
-        // Fall back to base student data on any load error
-        const fallback = realStudents.map(student => ({
-          student_id: student.id,
-          student_name: student.name,
-          student_email: student.email,
-          class_name: student.major,
-          attendance: student.attendanceRate,
-          engagement: student.engagementScore,
-          grade: Math.round(student.gpa * 25),
-          teacher_name: 'HighView Staff',
-          session_date: student.enrollmentDate,
-          photo_url: student.picture,
-          department: student.university,
-          topic: student.cohort,
-          speaking_time: Math.round(student.sessionsAttended * 10),
-          record_id: `${student.id}_${student.name.replace(/\s/g, '_')}`
-        }))
-        setApiStudents(fallback)
-        setError(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStudents()
+    setLoading(true)
+    getStudents().then(records => {
+      const transformed = records.map(s => ({
+        student_id: s.id,
+        student_name: s.name,
+        student_email: s.email,
+        class_name: s.major,
+        attendance: s.attendance_rate,
+        engagement: s.engagement_score,
+        grade: Math.round(s.gpa * 25),
+        teacher_name: 'HighView Staff',
+        session_date: s.enrollment_date,
+        photo_url: s.picture,
+        department: s.university,
+        topic: s.cohort,
+        speaking_time: s.sessions_attended,
+        record_id: `${s.id}_${s.name.replace(/\s/g, '_')}`
+      }))
+      setApiStudents(transformed)
+      setError(null)
+      setLoading(false)
+    }).catch(() => {
+      setError('Failed to load students from database.')
+      setLoading(false)
+    })
   }, [])
 
-  // Handler for adding a new student
+  // Handler for adding a new student to Supabase
   const handleAddStudent = async () => {
     try {
       setAddStudentError(null)
@@ -102,36 +71,38 @@ export default function StudentsPage() {
         return
       }
 
-      // Create new student object
-      const newStudent = {
+      await addStudentRecord({
+        id: newStudentForm.id,
+        name: newStudentForm.name,
+        email: newStudentForm.email,
+        phone: '',
+        university: newStudentForm.class_name || '',
+        major: newStudentForm.class_name || 'Not Assigned',
+        expected_graduation: new Date().getFullYear() + 2,
+        cohort: '2026-27 College Cohort',
+        enrollment_date: new Date().toISOString().split('T')[0],
+        status: 'Active',
+        attendance_rate: 0,
+        engagement_score: 0,
+        sessions_attended: 0,
+        total_sessions: 0,
+        gpa: 0,
+        picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(newStudentForm.name)}&background=4f46e5&color=fff`,
+      })
+
+      const newStudentRow = {
         student_id: newStudentForm.id,
         student_name: newStudentForm.name,
         student_email: newStudentForm.email,
         class_name: newStudentForm.class_name || 'Not Assigned',
-        attendance: 0,
-        engagement: 0,
-        grade: 0,
+        attendance: 0, engagement: 0, grade: 0,
         teacher_name: 'HighView Staff',
         session_date: new Date().toISOString().split('T')[0],
-        photo_url: '👨‍🎓',
-        department: 'New Student',
-        topic: 'Current Cohort',
-        speaking_time: 0,
+        photo_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(newStudentForm.name)}&background=4f46e5&color=fff`,
+        department: '', topic: '2026-27 College Cohort', speaking_time: 0,
         record_id: `${newStudentForm.id}_${newStudentForm.name.replace(/\s/g, '_')}`
       }
-
-      // Load existing custom students from localStorage
-      const savedStudents = localStorage.getItem('customStudents')
-      const customStudents = savedStudents ? JSON.parse(savedStudents) : []
-      
-      // Add new student
-      customStudents.push(newStudent)
-      
-      // Save to localStorage
-      localStorage.setItem('customStudents', JSON.stringify(customStudents))
-
-      // Update UI
-      setApiStudents(prev => [...prev, newStudent])
+      setApiStudents(prev => [...prev, newStudentRow])
       setAddStudentSuccess(true)
       setTimeout(() => {
         setAddStudentSuccess(false)

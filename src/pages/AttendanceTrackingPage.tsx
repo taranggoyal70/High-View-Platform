@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Users, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { ArrowLeft, Users, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../components/ui/button'
-import { realStudents } from '../data/transformStudents'
+import { getStudents, getSessionRegistrations } from '../services/supabaseService'
 
 interface AttendanceRecord {
   id: string
@@ -16,25 +16,53 @@ interface AttendanceRecord {
 export default function AttendanceTrackingPage() {
   const navigate = useNavigate()
   const { sessionId } = useParams()
+  const [loadingStudents, setLoadingStudents] = useState(true)
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
 
-  // Generate real attendance records from realStudents
-  const initialRecords = useMemo<AttendanceRecord[]>(() => {
-    return realStudents.slice(0, 25).map((student) => ({
-      id: student.id,
-      studentName: student.name,
-      studentId: student.id,
-      status: student.attendanceRate > 75 ? 'present' : 'absent',
-      notes: ''
-    }))
-  }, [])
+  useEffect(() => {
+    async function loadAttendance() {
+      // Try to load saved attendance from localStorage first
+      const saved = localStorage.getItem(`attendance_${sessionId || 'default'}`)
+      if (saved) {
+        setAttendanceRecords(JSON.parse(saved))
+        setLoadingStudents(false)
+        return
+      }
 
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => {
-    const saved = localStorage.getItem(`attendance_${sessionId || 'default'}`)
-    return saved ? JSON.parse(saved) as AttendanceRecord[] : initialRecords
-  })
+      // Load session registrations if we have a sessionId
+      if (sessionId) {
+        try {
+          const regs = await getSessionRegistrations(sessionId)
+          if (regs.length > 0) {
+            setAttendanceRecords(regs.map(r => ({
+              id: r.user_id,
+              studentName: r.student_name,
+              studentId: r.user_id,
+              status: 'present',
+              notes: ''
+            })))
+            setLoadingStudents(false)
+            return
+          }
+        } catch { /* fall through to all students */ }
+      }
+
+      // Fall back to loading all students from Supabase
+      const students = await getStudents()
+      setAttendanceRecords(students.map(s => ({
+        id: s.id,
+        studentName: s.name,
+        studentId: s.id,
+        status: s.attendance_rate > 75 ? 'present' : 'absent',
+        notes: ''
+      })))
+      setLoadingStudents(false)
+    }
+    loadAttendance()
+  }, [sessionId])
 
   // Calculate session stats from real data
-  const sessionData = useMemo(() => {
+  const sessionData = (() => {
     const presentCount = attendanceRecords.filter(r => r.status === 'present').length
     const absentCount = attendanceRecords.filter(r => r.status === 'absent').length
     const totalStudents = attendanceRecords.length
@@ -50,7 +78,7 @@ export default function AttendanceTrackingPage() {
       absentToday: absentCount,
       attendanceRate,
     }
-  }, [sessionId, attendanceRecords])
+  })()
 
   const handleStatusChange = (id: string, newStatus: string) => {
     setAttendanceRecords((records: AttendanceRecord[]) => {
@@ -62,6 +90,14 @@ export default function AttendanceTrackingPage() {
       localStorage.setItem(key, JSON.stringify(updated))
       return updated
     })
+  }
+
+  if (loadingStudents) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    )
   }
 
   return (

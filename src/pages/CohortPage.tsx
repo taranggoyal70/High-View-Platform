@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Download, Search, ChevronDown, Settings, ArrowUpDown } from 'lucide-react'
+import { Download, Search, ChevronDown, Settings, ArrowUpDown, Loader2 } from 'lucide-react'
 import { Button } from '../components/ui/button'
-import { cohortStudents, realStudents } from '../data/transformStudents'
+import { transformToCohortStudent } from '../data/transformStudents'
+import type { RealStudent } from '../data/transformStudents'
+import { getStudents } from '../services/supabaseService'
 
 // ── Real data from students.json ──────────────────────────────────────────────
 
@@ -31,7 +33,7 @@ interface Student {
   staffNotes: { text: string; date: string; author: string }[]
 }
 
-const STUDENTS: Student[] = cohortStudents
+// STUDENTS is populated from Supabase — see useState below
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -186,6 +188,27 @@ export default function CohortPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [sortColumn, setSortColumn] = useState<'name' | 'school' | 'year' | 'ai' | 'experiential' | 'sessionAttendance' | 'status' | 'lastActive' | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [rawStudents, setRawStudents] = useState<RealStudent[]>([])
+  const [loadingStudents, setLoadingStudents] = useState(true)
+
+  useEffect(() => {
+    getStudents().then(records => {
+      const mapped: RealStudent[] = records.map(r => ({
+        id: r.id, name: r.name, email: r.email, phone: r.phone,
+        university: r.university, major: r.major,
+        expectedGraduation: r.expected_graduation, cohort: r.cohort,
+        enrollmentDate: r.enrollment_date, status: r.status as 'Active' | 'At Risk',
+        attendanceRate: r.attendance_rate, engagementScore: r.engagement_score,
+        sessionsAttended: r.sessions_attended, totalSessions: r.total_sessions,
+        gpa: r.gpa, picture: r.picture,
+      }))
+      setRawStudents(mapped)
+      setLoadingStudents(false)
+    })
+  }, [])
+
+  const STUDENTS = useMemo(() => rawStudents.map(transformToCohortStudent), [rawStudents])
+  const realStudents = rawStudents
 
   const totalStudents = realStudents.length
 
@@ -319,6 +342,14 @@ export default function CohortPage() {
     a.download = 'cohort-report.csv'
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  if (loadingStudents) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    )
   }
 
   return (

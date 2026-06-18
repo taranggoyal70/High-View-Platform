@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { SemesterSelector } from '@/components/SemesterSelector'
 import { useSemester } from '@/contexts/SemesterContext'
-import { getStudentsBySemester, calculateTrend } from '@/data/semesterData'
+import { getStudentSemesterStats } from '@/services/supabaseService'
 
 interface LeaderboardEntry {
   rank: number
@@ -29,6 +29,7 @@ export default function LeaderboardPage() {
   const [sortColumn, setSortColumn] = useState<SortColumn>('rank')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [userRole, setUserRole] = useState<'staff' | 'student'>('student')
+  const [semesterStats, setSemesterStats] = useState<any[]>([])
 
   // Check user role and redirect students
   useEffect(() => {
@@ -36,13 +37,16 @@ export default function LeaderboardPage() {
     if (userData) {
       const user = JSON.parse(userData)
       setUserRole(user.type || 'student')
-      
-      // Redirect students away from leaderboard
       if (user.type === 'student') {
         navigate('/')
       }
     }
   }, [navigate])
+
+  // Load semester stats from Supabase
+  useEffect(() => {
+    getStudentSemesterStats(selectedSemester.id).then(setSemesterStats)
+  }, [selectedSemester.id])
 
   // If student, show access denied message while redirecting
   if (userRole === 'student') {
@@ -68,24 +72,23 @@ export default function LeaderboardPage() {
     )
   }
 
-  // Get semester-specific student data
-  const semesterStudents = useMemo(() => {
-    return getStudentsBySemester(selectedSemester.id)
-  }, [selectedSemester.id])
-
-  // Convert to leaderboard format with rankings using actual trend data
+  // Convert Supabase semester stats to leaderboard format
   const baseLeaderboardData: LeaderboardEntry[] = useMemo(() => {
-    return semesterStudents.map((student, index) => ({
-      rank: index + 1,
-      studentName: student.name,
-      studentId: student.studentId,
-      engagementScore: student.engagementScore,
-      attendanceRate: student.attendanceRate,
-      participationPoints: student.participationPoints,
-      totalPoints: student.totalPoints,
-      trend: calculateTrend(student)
-    }))
-  }, [semesterStudents])
+    return semesterStats.map((s, index) => {
+      const diff = s.previous_semester_score != null ? s.engagement_score - s.previous_semester_score : 0
+      const trend: 'up' | 'down' | 'same' = diff > 2 ? 'up' : diff < -2 ? 'down' : 'same'
+      return {
+        rank: index + 1,
+        studentName: s.student_name,
+        studentId: s.student_id,
+        engagementScore: s.engagement_score,
+        attendanceRate: s.attendance_rate,
+        participationPoints: s.participation_points,
+        totalPoints: s.total_points,
+        trend,
+      }
+    })
+  }, [semesterStats])
 
   // Sort leaderboard data based on selected column and direction
   const sortedLeaderboardData = useMemo(() => {
@@ -128,11 +131,11 @@ export default function LeaderboardPage() {
 
   // Update top performers based on current semester data
   const topPerformers = useMemo(() => {
-    if (semesterStudents.length === 0) return []
-    const sorted = [...semesterStudents].sort((a, b) => b.engagementScore - a.engagementScore)
+    if (semesterStats.length === 0) return []
+    const sorted = [...semesterStats].sort((a, b) => b.engagementScore - a.engagementScore)
     const topEngagement = sorted[0]
-    const topAttendance = [...semesterStudents].sort((a, b) => b.attendanceRate - a.attendanceRate)[0]
-    const topParticipation = [...semesterStudents].sort((a, b) => b.participationPoints - a.participationPoints)[0]
+    const topAttendance = [...semesterStats].sort((a, b) => b.attendanceRate - a.attendanceRate)[0]
+    const topParticipation = [...semesterStats].sort((a, b) => b.participationPoints - a.participationPoints)[0]
     
     // Find fastest improver - student with upward trend and highest engagement among trending up students
     const improvingStudents = sortedLeaderboardData.filter(s => s.trend === 'up')
@@ -146,7 +149,7 @@ export default function LeaderboardPage() {
       { category: 'Most Participation', student: topParticipation.name, score: `${topParticipation.participationPoints} pts`, icon: Users },
       { category: 'Fastest Improver', student: fastestImprover?.studentName || topEngagement.name, score: fastestImprover ? `${fastestImprover.engagementScore}% eng.` : `${topEngagement.engagementScore}% eng.`, icon: TrendingUp }
     ]
-  }, [semesterStudents, sortedLeaderboardData])
+  }, [semesterStats, sortedLeaderboardData])
 
   const getRankIcon = (rank: number) => {
     switch (rank) {
