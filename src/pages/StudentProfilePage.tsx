@@ -65,11 +65,11 @@ function getYear(studentId: string): string {
   return ['Freshman', 'Sophomore', 'Junior', 'Senior'][n]
 }
 
-function getStatus(s: StudentRecord): 'Active' | 'At Risk' | 'Inactive' {
+function getStatus(s: StudentRecord): 'On track' | 'At risk' | 'Disengaged' {
   const p = Math.round((s.attendance + s.engagement) / 2)
-  if (p >= 80) return 'Active'
-  if (p >= 65) return 'At Risk'
-  return 'Inactive'
+  if (p >= 60) return 'On track'
+  if (p >= 30) return 'At risk'
+  return 'Disengaged'
 }
 
 function getLetterGrade(grade: number): string {
@@ -248,8 +248,8 @@ export default function StudentProfilePage() {
                 <div className="flex flex-col md:flex-row md:items-center gap-3 mb-2">
                   <h1 className="text-2xl font-bold">{student.student_name}</h1>
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold w-fit ${
-                    status === 'Active' ? 'bg-green-100 text-green-700' :
-                    status === 'At Risk' ? 'bg-yellow-100 text-yellow-700' :
+                    status === 'On track' ? 'bg-green-100 text-green-700' :
+                    status === 'At risk' ? 'bg-amber-100 text-amber-700' :
                     'bg-red-100 text-red-700'
                   }`}>{status}</span>
                 </div>

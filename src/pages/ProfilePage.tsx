@@ -3,12 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Mail, Calendar, Bell, Shield, Moon, Globe, Sun, ChevronRight, CheckCircle,
   Briefcase, MapPin, Phone, GraduationCap, BookOpen, Tag, Edit2, X, Link as LinkIcon,
-  Github,
+  Github, Upload, FileText, Trash2, Loader2, Download,
 } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { useSettings } from '../contexts/SettingsContext'
 import { authService } from '../services/authService'
-import { getStudentProfile, saveStudentProfile } from '../services/supabaseService'
+import { getStudentProfile, saveStudentProfile, getDocuments, uploadDocument, deleteDocument, getDocumentUrl } from '../services/supabaseService'
+import type { Document as SupabaseDoc } from '../services/supabaseService'
 
 // ── Shared Toggle ─────────────────────────────────────────────────────────
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -416,6 +417,102 @@ function StudentProfileSection({ user }: { user: any }) {
   )
 }
 
+const DOC_TYPES = [
+  { key: 'resume', label: 'Resume' },
+  { key: 'transcript', label: 'College Transcript' },
+  { key: 'cover_letter', label: 'Cover Letter' },
+]
+
+function DocumentsSection({ userId }: { userId: string }) {
+  const [docs, setDocs] = useState<SupabaseDoc[]>([])
+  const [uploading, setUploading] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!userId) return
+    getDocuments(userId).then(setDocs)
+  }, [userId])
+
+  const handleUpload = async (type: string, file: File) => {
+    const allowed = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    if (!allowed.includes(file.type)) { setError('Only PDF and Word documents are accepted.'); return }
+    if (file.size > 5 * 1024 * 1024) { setError('File must be under 5MB.'); return }
+    setError(null)
+    setUploading(type)
+    try {
+      const doc = await uploadDocument(userId, file, type)
+      setDocs(prev => [doc, ...prev.filter(d => d.type !== type)])
+    } catch (e: any) {
+      setError(e.message || 'Upload failed.')
+    } finally {
+      setUploading(null)
+    }
+  }
+
+  const handleDelete = async (doc: SupabaseDoc) => {
+    setDeleting(doc.id)
+    try {
+      await deleteDocument(doc.id, doc.file_path)
+      setDocs(prev => prev.filter(d => d.id !== doc.id))
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  const handleDownload = async (doc: SupabaseDoc) => {
+    const url = await getDocumentUrl(doc.file_path)
+    if (url) window.open(url, '_blank')
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-xl p-6 mb-5">
+      <h2 className="text-lg font-bold text-gray-900 mb-1">Documents</h2>
+      <p className="text-xs text-gray-500 mb-4">Upload your resume, transcript, and cover letter. Accepted: PDF, Word (max 5MB).</p>
+      {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+      <div className="space-y-3">
+        {DOC_TYPES.map(({ key, label }) => {
+          const existing = docs.find(d => d.type === key)
+          return (
+            <div key={key} className="flex items-center justify-between p-3 border rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{label}</p>
+                  {existing
+                    ? <p className="text-xs text-gray-500">{existing.file_name} · {(existing.file_size / 1024).toFixed(0)} KB</p>
+                    : <p className="text-xs text-gray-400">Not uploaded</p>
+                  }
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {existing && (
+                  <>
+                    <button onClick={() => handleDownload(existing)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="Download">
+                      <Download className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => handleDelete(existing)} disabled={deleting === existing.id} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="Delete">
+                      {deleting === existing.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </button>
+                  </>
+                )}
+                <label className="cursor-pointer flex items-center gap-1 px-3 py-1.5 text-xs font-medium border rounded-lg hover:bg-gray-50 transition-colors">
+                  {uploading === key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                  {existing ? 'Replace' : 'Upload'}
+                  <input type="file" accept=".pdf,.doc,.docx" className="hidden" disabled={!!uploading}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(key, f); e.target.value = '' }} />
+                </label>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Main ProfilePage ───────────────────────────────────────────────────────
 export default function ProfilePage() {
   const { settings, updateSetting, formatDate, formatTime } = useSettings()
@@ -671,7 +768,12 @@ export default function ProfilePage() {
           )}
 
           {/* ── Student: LinkedIn-style profile ────────────────────────── */}
-          {!isStaff && <StudentProfileSection user={user} />}
+          {!isStaff && (
+            <>
+              <StudentProfileSection user={user} />
+              <DocumentsSection userId={user.id} />
+            </>
+          )}
 
           {/* ── Settings — all roles ────────────────────────────────────── */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}

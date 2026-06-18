@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, MapPin, DollarSign, Users, Plus, X, Edit2 } from 'lucide-react'
+import { Search, MapPin, DollarSign, Users, Plus, X, Edit2, CheckCircle2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 
@@ -78,6 +78,9 @@ export default function OpportunitiesPage() {
   const [activeFilter, setActiveFilter] = useState<typeof filterOptions[number]>('All')
   const [sortByDeadline, setSortByDeadline] = useState<'asc' | 'desc'>('asc')
   const [userRole, setUserRole] = useState<'staff' | 'student'>('student')
+  const [appStatus, setAppStatus] = useState<Record<string, 'applied' | 'completed'>>(() => {
+    try { return JSON.parse(localStorage.getItem('opportunityStatus') || '{}') } catch { return {} }
+  })
   const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
     // Load opportunities from localStorage or use mock data
     const saved = localStorage.getItem('opportunities')
@@ -104,8 +107,24 @@ export default function OpportunitiesPage() {
     if (userData) {
       const user = JSON.parse(userData)
       setUserRole(user.type || 'student')
+      // Load per-user status
+      const key = `opportunityStatus_${user.id || user.email}`
+      try { const saved = localStorage.getItem(key); if (saved) setAppStatus(JSON.parse(saved)) } catch {}
     }
   }, [])
+
+  const setOppStatus = (oppId: string, status: 'applied' | 'completed' | null) => {
+    const userData = localStorage.getItem('user')
+    const user = userData ? JSON.parse(userData) : {}
+    const key = `opportunityStatus_${user.id || user.email}`
+    setAppStatus(prev => {
+      const updated = { ...prev }
+      if (status === null) delete updated[oppId]
+      else updated[oppId] = status
+      localStorage.setItem(key, JSON.stringify(updated))
+      return updated
+    })
+  }
 
   // Save opportunities to localStorage whenever they change
   useEffect(() => {
@@ -327,9 +346,9 @@ export default function OpportunitiesPage() {
                 )}
               </div>
 
-              {/* Application Link */}
-              {opportunity.applicationLink && (
-                <div className="mt-4">
+              {/* Application Link + Tracking */}
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                {opportunity.applicationLink && (
                   <a
                     href={opportunity.applicationLink}
                     target="_blank"
@@ -342,8 +361,31 @@ export default function OpportunitiesPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                   </a>
-                </div>
-              )}
+                )}
+                {userRole === 'student' && (
+                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                    {appStatus[opportunity.id] === 'completed' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
+                        <CheckCircle2 className="w-4 h-4" /> Completed
+                        <button onClick={() => setOppStatus(opportunity.id, null)} className="ml-1 text-green-500 hover:text-green-700 text-xs underline">undo</button>
+                      </span>
+                    ) : appStatus[opportunity.id] === 'applied' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-sm font-medium">
+                        <Clock className="w-4 h-4" /> Applied
+                        <button onClick={() => setOppStatus(opportunity.id, 'completed')} className="ml-1 text-amber-600 hover:text-amber-800 text-xs underline">mark completed</button>
+                        <button onClick={() => setOppStatus(opportunity.id, null)} className="ml-1 text-amber-500 hover:text-amber-700 text-xs underline">undo</button>
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setOppStatus(opportunity.id, 'applied')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                      >
+                        <Clock className="w-4 h-4" /> Mark as Applied
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>

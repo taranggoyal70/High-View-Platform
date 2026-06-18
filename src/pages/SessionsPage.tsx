@@ -136,6 +136,24 @@ export default function SessionsPage() {
 
   const [sessionFormError, setSessionFormError] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [noShows, setNoShows] = useState<Record<number, string[]>>(() => {
+    try { return JSON.parse(localStorage.getItem('sessionNoShows') || '{}') } catch { return {} }
+  })
+
+  const toggleNoShow = (sessionId: number, studentId: string) => {
+    setNoShows(prev => {
+      const current = prev[sessionId] || []
+      const updated = current.includes(studentId)
+        ? current.filter(id => id !== studentId)
+        : [...current, studentId]
+      const next = { ...prev, [sessionId]: updated }
+      localStorage.setItem('sessionNoShows', JSON.stringify(next))
+      return next
+    })
+  }
+
+  const isNoShow = (sessionId: number, studentId: string) =>
+    (noShows[sessionId] || []).includes(studentId)
 
   const handleAddSession = () => {
     if (!sessionFormData.title || !sessionFormData.date || !sessionFormData.time || !sessionFormData.instructor) {
@@ -740,8 +758,16 @@ export default function SessionsPage() {
                 <div>
                   <h2 className="text-2xl font-bold">{selectedSessionForView.title}</h2>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {getRegistrationCount(selectedSessionForView.id)} students registered
+                    {getRegistrationCount(selectedSessionForView.id)} registered
+                    {(noShows[selectedSessionForView.id]?.length ?? 0) > 0 && (
+                      <span className="ml-2 text-red-500 font-medium">
+                        · {noShows[selectedSessionForView.id].length} no-show{noShows[selectedSessionForView.id].length > 1 ? 's' : ''}
+                      </span>
+                    )}
                   </p>
+                  {userRole === 'staff' && (
+                    <p className="text-xs text-muted-foreground mt-1">Click "No-show" to flag students who didn't attend.</p>
+                  )}
                 </div>
                 <Button
                   variant="outline"
@@ -755,7 +781,7 @@ export default function SessionsPage() {
                 </Button>
               </div>
             </div>
-            
+
             <div className="p-6 overflow-y-auto max-h-[60vh]">
               {getRegistrationCount(selectedSessionForView.id) === 0 ? (
                 <div className="text-center py-12">
@@ -764,24 +790,44 @@ export default function SessionsPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {getRegisteredStudents(selectedSessionForView.id).map((student) => (
-                    <div
-                      key={student.id}
-                      className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/30 transition-colors"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
-                        {student.name.charAt(0)}
+                  {getRegisteredStudents(selectedSessionForView.id).map((student) => {
+                    const flagged = isNoShow(selectedSessionForView.id, student.id)
+                    return (
+                      <div
+                        key={student.id}
+                        className={`flex items-center gap-4 p-4 border rounded-lg transition-colors ${flagged ? 'bg-red-50 border-red-200' : 'hover:bg-muted/30'}`}
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${flagged ? 'bg-red-400' : 'bg-gradient-to-br from-blue-500 to-purple-500'}`}>
+                          {student.name.charAt(0)}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold">{student.name}</p>
+                            {flagged && <span className="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-semibold rounded-full">No-show</span>}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{student.email}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{student.major}</p>
+                            <p className="text-xs text-muted-foreground">{student.university}</p>
+                          </div>
+                          {userRole === 'staff' && (
+                            <button
+                              onClick={() => toggleNoShow(selectedSessionForView.id, student.id)}
+                              className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                                flagged
+                                  ? 'bg-red-100 border-red-300 text-red-700 hover:bg-red-200'
+                                  : 'border-gray-300 text-gray-600 hover:bg-gray-100'
+                              }`}
+                            >
+                              {flagged ? 'Undo' : 'No-show'}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <p className="font-semibold">{student.name}</p>
-                        <p className="text-sm text-muted-foreground">{student.email}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">{student.major}</p>
-                        <p className="text-xs text-muted-foreground">{student.university}</p>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

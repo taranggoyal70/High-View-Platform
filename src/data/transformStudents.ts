@@ -28,7 +28,7 @@ export interface CohortStudent {
   ai: number
   experiential: number
   sessionAttendance: number
-  status: 'On track' | 'At risk'
+  status: 'On track' | 'At risk' | 'Disengaged'
   lastActive: string
   email: string
   phone: string
@@ -77,7 +77,11 @@ export function transformToCohortStudent(student: RealStudent): CohortStudent {
     ai: student.engagementScore,
     experiential: Math.round(student.attendanceRate * 0.8),
     sessionAttendance: student.attendanceRate,
-    status: student.status === 'Active' ? 'On track' : 'At risk',
+    status: student.engagementScore >= 60
+      ? 'On track'
+      : student.engagementScore >= 30
+        ? 'At risk'
+        : 'Disengaged',
     lastActive: getLastActive(student.attendanceRate),
     email: student.email,
     phone: student.phone,

@@ -17,7 +17,7 @@ interface Student {
   ai: number
   experiential: number
   sessionAttendance: number
-  status: 'On track' | 'At risk'
+  status: 'On track' | 'At risk' | 'Disengaged'
   lastActive: string
   email: string
   phone: string
@@ -96,7 +96,7 @@ function InlineProfile({ student, onClose }: { student: Student; onClose: () => 
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  student.status === 'On track' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                  student.status === 'On track' ? 'bg-green-100 text-green-700' : student.status === 'At risk' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'
                 }`}>{student.status}</span>
                 <button onClick={onClose} className="text-sm border rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors">
                   Close
@@ -544,7 +544,7 @@ export default function CohortPage() {
                     onChange={e => setStatusFilter(e.target.value)}
                     className="appearance-none border rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
                   >
-                    {['All status', 'On track', 'At risk'].map(s => <option key={s}>{s}</option>)}
+                    {['All status', 'On track', 'At risk', 'Disengaged'].map(s => <option key={s}>{s}</option>)}
                   </select>
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                 </div>
@@ -634,7 +634,9 @@ export default function CohortPage() {
                           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
                             student.status === 'On track'
                               ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-600'
+                              : student.status === 'At risk'
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-red-100 text-red-600'
                           }`}>{student.status}</span>
                         </td>
                         <td className="px-4 py-4 text-gray-500">{student.lastActive}</td>
