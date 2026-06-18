@@ -319,3 +319,83 @@ export async function saveProgressOverrides(
     }, { onConflict: 'student_user_id' })
   if (error) throw new Error(error.message)
 }
+
+// ── Opportunities ──────────────────────────────────────────────────────────
+
+export interface OpportunityRecord {
+  id: string
+  title: string
+  company: string
+  type: string
+  tags: string[]
+  location: string
+  pay: string
+  duration: string
+  spots: number | null
+  deadline: string
+  status: string
+  is_paid: boolean
+  application_link: string
+  created_at: string
+}
+
+export async function getOpportunities(): Promise<OpportunityRecord[]> {
+  const { data, error } = await supabase
+    .from('opportunities')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error || !data) return []
+  return data as OpportunityRecord[]
+}
+
+export async function addOpportunity(opp: Omit<OpportunityRecord, 'id' | 'created_at'>): Promise<OpportunityRecord> {
+  const { data, error } = await supabase
+    .from('opportunities')
+    .insert(opp)
+    .select()
+    .single()
+  if (error || !data) throw new Error(error?.message ?? 'Failed to add opportunity')
+  return data as OpportunityRecord
+}
+
+export async function updateOpportunity(id: string, opp: Partial<OpportunityRecord>): Promise<void> {
+  const { error } = await supabase
+    .from('opportunities')
+    .update({ ...opp, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function deleteOpportunity(id: string): Promise<void> {
+  const { error } = await supabase.from('opportunities').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// ── Opportunity Applications ───────────────────────────────────────────────
+
+export async function getMyApplications(userId: string): Promise<Record<string, 'applied' | 'completed'>> {
+  const { data, error } = await supabase
+    .from('opportunity_applications')
+    .select('opportunity_id, status')
+    .eq('user_id', userId)
+  if (error || !data) return {}
+  const map: Record<string, 'applied' | 'completed'> = {}
+  data.forEach((row: any) => { map[row.opportunity_id] = row.status })
+  return map
+}
+
+export async function upsertApplication(userId: string, opportunityId: string, status: 'applied' | 'completed' | null): Promise<void> {
+  if (status === null) {
+    await supabase.from('opportunity_applications').delete().eq('user_id', userId).eq('opportunity_id', opportunityId)
+    return
+  }
+  const { error } = await supabase
+    .from('opportunity_applications')
+    .upsert({
+      user_id: userId,
+      opportunity_id: opportunityId,
+      status,
+      completed_at: status === 'completed' ? new Date().toISOString() : null,
+    }, { onConflict: 'user_id,opportunity_id' })
+  if (error) throw new Error(error.message)
+}

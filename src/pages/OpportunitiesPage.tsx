@@ -1,148 +1,85 @@
 import { useState, useEffect } from 'react'
-import { Search, MapPin, DollarSign, Users, Plus, X, Edit2, CheckCircle2, Clock } from 'lucide-react'
+import { Search, MapPin, DollarSign, Users, Plus, X, Edit2, CheckCircle2, Clock, Loader2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
-
-interface Opportunity {
-  id: string
-  title: string
-  company: string
-  type: 'Job shadows' | 'Micro-internships' | 'Networking' | 'Mentorship' | 'Hackathons' | 'Internships' | 'Workshops' | 'Career Fairs' | 'Volunteer'
-  tags: string[]
-  location: string
-  pay?: string
-  duration?: string
-  spots?: number
-  students?: number
-  deadline?: string
-  status?: 'New' | 'Closes Soon'
-  isPaid?: boolean
-  applicationLink?: string
-}
-
-const mockOpportunities: Opportunity[] = [
-  {
-    id: '1',
-    title: 'Brand Strategy Micro-Internship',
-    company: 'Crocs Inc.',
-    type: 'Micro-internships',
-    tags: ['Marketing', '6 weeks'],
-    location: 'Remote',
-    pay: '$18/hr',
-    students: 3,
-    deadline: 'Apr 15',
-    status: 'Closes Soon',
-    isPaid: true
-  },
-  {
-    id: '2',
-    title: 'Curated Connections — Spring',
-    company: 'HighView × 8 Partners',
-    type: 'Networking',
-    tags: ['Apr 4'],
-    location: 'Virtual',
-    pay: 'Free',
-    spots: 30,
-    status: 'New',
-    isPaid: false
-  },
-  {
-    id: '3',
-    title: 'HR Job Shadow',
-    company: 'Pinnacol Assurance',
-    type: 'Job shadows',
-    tags: ['HR / People Ops', 'Half day'],
-    location: 'Denver, CO',
-    students: 1,
-    isPaid: false
-  },
-  {
-    id: '4',
-    title: 'Embedded Project Team — AI Strategy',
-    company: 'ChatWalrus',
-    type: 'Micro-internships',
-    tags: ['Tech / AI', '10 weeks'],
-    location: 'Hybrid',
-    pay: '$20/hr',
-    students: 4,
-    deadline: 'May 1',
-    status: 'Closes Soon',
-    isPaid: true
-  }
-]
+import { supabase } from '../lib/supabase'
+import { getOpportunities, addOpportunity, updateOpportunity, deleteOpportunity, getMyApplications, upsertApplication } from '../services/supabaseService'
+import type { OpportunityRecord } from '../services/supabaseService'
 
 const filterOptions = ['All', 'Job shadows', 'Micro-internships', 'Networking', 'Mentorship', 'Hackathons', 'Internships', 'Workshops', 'Career Fairs', 'Volunteer'] as const
+
+type FormState = Partial<Omit<OpportunityRecord, 'id' | 'created_at'>>
+
+const emptyForm: FormState = {
+  title: '',
+  company: '',
+  type: 'Job shadows',
+  tags: [],
+  location: '',
+  pay: '',
+  duration: '',
+  spots: null,
+  deadline: '',
+  status: '',
+  is_paid: false,
+  application_link: '',
+}
 
 export default function OpportunitiesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<typeof filterOptions[number]>('All')
   const [sortByDeadline, setSortByDeadline] = useState<'asc' | 'desc'>('asc')
   const [userRole, setUserRole] = useState<'staff' | 'student'>('student')
-  const [appStatus, setAppStatus] = useState<Record<string, 'applied' | 'completed'>>(() => {
-    try { return JSON.parse(localStorage.getItem('opportunityStatus') || '{}') } catch { return {} }
-  })
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
-    // Load opportunities from localStorage or use mock data
-    const saved = localStorage.getItem('opportunities')
-    return saved ? JSON.parse(saved) : mockOpportunities
-  })
+  const [userId, setUserId] = useState<string | null>(null)
+  const [appStatus, setAppStatus] = useState<Record<string, 'applied' | 'completed'>>({})
+  const [opportunities, setOpportunities] = useState<OpportunityRecord[]>([])
+  const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
-  const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null)
-  const [formData, setFormData] = useState<Partial<Opportunity>>({
-    title: '',
-    company: '',
-    type: 'Job shadows',
-    tags: [],
-    location: '',
-    pay: '',
-    duration: '',
-    spots: 0,
-    deadline: '',
-    isPaid: false,
-    applicationLink: '',
-  })
+  const [editingOpportunity, setEditingOpportunity] = useState<OpportunityRecord | null>(null)
+  const [formData, setFormData] = useState<FormState>(emptyForm)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const user = JSON.parse(userData)
-      setUserRole(user.type || 'student')
-      // Load per-user status
-      const key = `opportunityStatus_${user.id || user.email}`
-      try { const saved = localStorage.getItem(key); if (saved) setAppStatus(JSON.parse(saved)) } catch {}
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser()
+      const role = (user?.user_metadata?.role === 'staff' || user?.user_metadata?.role === 'admin') ? 'staff' : 'student'
+      setUserRole(role)
+      if (user) setUserId(user.id)
+
+      const opps = await getOpportunities()
+      setOpportunities(opps)
+
+      if (role === 'student' && user) {
+        const status = await getMyApplications(user.id)
+        setAppStatus(status)
+      }
+
+      setLoading(false)
     }
+    init()
   }, [])
 
-  const setOppStatus = (oppId: string, status: 'applied' | 'completed' | null) => {
-    const userData = localStorage.getItem('user')
-    const user = userData ? JSON.parse(userData) : {}
-    const key = `opportunityStatus_${user.id || user.email}`
+  const setOppStatus = async (oppId: string, status: 'applied' | 'completed' | null) => {
+    if (!userId) return
     setAppStatus(prev => {
       const updated = { ...prev }
       if (status === null) delete updated[oppId]
       else updated[oppId] = status
-      localStorage.setItem(key, JSON.stringify(updated))
       return updated
     })
+    await upsertApplication(userId, oppId, status)
   }
 
-  // Save opportunities to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('opportunities', JSON.stringify(opportunities))
-  }, [opportunities])
-
-  // Get filter options based on user role
-  const availableFilters = userRole === 'student' 
-    ? filterOptions.filter(f => f !== 'Mentorship')
-    : filterOptions
-
-  // Helper function to check if deadline has passed
   const isExpired = (deadline?: string) => {
     if (!deadline) return false
     const currentYear = new Date().getFullYear()
     const deadlineDate = new Date(`${deadline}, ${currentYear}`)
     return deadlineDate < new Date()
   }
+
+  const availableFilters = userRole === 'student'
+    ? filterOptions.filter(f => f !== 'Mentorship')
+    : filterOptions
 
   const filteredOpportunities = opportunities
     .filter(opp => {
@@ -165,6 +102,64 @@ export default function OpportunitiesPage() {
 
   const openCount = filteredOpportunities.length
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      if (editingOpportunity) {
+        await updateOpportunity(editingOpportunity.id, formData)
+        setOpportunities(opps => opps.map(o => o.id === editingOpportunity.id ? { ...o, ...formData } : o))
+      } else {
+        const newOpp = await addOpportunity({
+          title: formData.title || '',
+          company: formData.company || '',
+          type: formData.type || 'Job shadows',
+          tags: formData.tags || [],
+          location: formData.location || '',
+          pay: formData.pay || '',
+          duration: formData.duration || '',
+          spots: formData.spots ?? null,
+          deadline: formData.deadline || '',
+          status: formData.status || '',
+          is_paid: formData.is_paid || false,
+          application_link: formData.application_link || '',
+        })
+        setOpportunities(opps => [newOpp, ...opps])
+      }
+      setModalOpen(false)
+      setEditingOpportunity(null)
+      setFormData(emptyForm)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!editingOpportunity) return
+    setSaving(true)
+    try {
+      await deleteOpportunity(editingOpportunity.id)
+      setOpportunities(opps => opps.filter(o => o.id !== editingOpportunity.id))
+      setModalOpen(false)
+      setEditingOpportunity(null)
+      setFormData(emptyForm)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -181,19 +176,7 @@ export default function OpportunitiesPage() {
               <Button
                 onClick={() => {
                   setEditingOpportunity(null)
-                  setFormData({
-                    title: '',
-                    company: '',
-                    type: 'Job shadows',
-                    tags: [],
-                    location: '',
-                    pay: '',
-                    duration: '',
-                    spots: 0,
-                    deadline: '',
-                    isPaid: false,
-                    applicationLink: '',
-                  })
+                  setFormData(emptyForm)
                   setModalOpen(true)
                 }}
                 className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
@@ -217,7 +200,7 @@ export default function OpportunitiesPage() {
           </div>
 
           {/* Filter Tabs */}
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             {availableFilters.map((filter) => (
               <button
                 key={filter}
@@ -262,7 +245,20 @@ export default function OpportunitiesPage() {
                   onClick={(e) => {
                     e.stopPropagation()
                     setEditingOpportunity(opportunity)
-                    setFormData(opportunity)
+                    setFormData({
+                      title: opportunity.title,
+                      company: opportunity.company,
+                      type: opportunity.type,
+                      tags: opportunity.tags,
+                      location: opportunity.location,
+                      pay: opportunity.pay,
+                      duration: opportunity.duration,
+                      spots: opportunity.spots,
+                      deadline: opportunity.deadline,
+                      status: opportunity.status,
+                      is_paid: opportunity.is_paid,
+                      application_link: opportunity.application_link,
+                    })
                     setModalOpen(true)
                   }}
                   className="absolute top-4 right-4 p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -294,7 +290,7 @@ export default function OpportunitiesPage() {
 
               {/* Tags */}
               <div className="flex flex-wrap gap-2 mb-4">
-                {opportunity.isPaid && (
+                {opportunity.is_paid && (
                   <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded text-sm font-medium">
                     Paid role
                   </span>
@@ -332,13 +328,7 @@ export default function OpportunitiesPage() {
                     <span>{opportunity.pay}</span>
                   </div>
                 )}
-                {opportunity.students !== undefined && (
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    <span>{opportunity.students} {opportunity.students === 1 ? 'student' : 'students'}</span>
-                  </div>
-                )}
-                {opportunity.spots !== undefined && (
+                {opportunity.spots != null && (
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4" />
                     <span>{opportunity.spots} spots</span>
@@ -348,9 +338,9 @@ export default function OpportunitiesPage() {
 
               {/* Application Link + Tracking */}
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                {opportunity.applicationLink && (
+                {opportunity.application_link && (
                   <a
-                    href={opportunity.applicationLink}
+                    href={opportunity.application_link}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
@@ -409,19 +399,7 @@ export default function OpportunitiesPage() {
               onClick={() => {
                 setModalOpen(false)
                 setEditingOpportunity(null)
-                setFormData({
-                  title: '',
-                  company: '',
-                  type: 'Job shadows',
-                  tags: [],
-                  location: '',
-                  pay: '',
-                  duration: '',
-                  spots: 0,
-                  deadline: '',
-                  isPaid: false,
-                  applicationLink: '',
-                })
+                setFormData(emptyForm)
               }}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
             >
@@ -432,49 +410,7 @@ export default function OpportunitiesPage() {
               {editingOpportunity ? 'Edit Opportunity' : 'Add New Opportunity'}
             </h2>
 
-            <form onSubmit={(e) => {
-              e.preventDefault()
-              
-              if (editingOpportunity) {
-                // Update existing opportunity
-                setOpportunities(opportunities.map(opp => 
-                  opp.id === editingOpportunity.id 
-                    ? { ...formData, id: editingOpportunity.id } as Opportunity
-                    : opp
-                ))
-              } else {
-                // Add new opportunity with proper defaults
-                const newOpportunity: Opportunity = {
-                  id: Date.now().toString(),
-                  title: formData.title || '',
-                  company: formData.company || '',
-                  type: formData.type || 'Job shadows',
-                  tags: formData.tags || [],
-                  location: formData.location || '',
-                  pay: formData.pay,
-                  duration: formData.duration,
-                  spots: formData.spots,
-                  deadline: formData.deadline,
-                  isPaid: formData.isPaid || false,
-                }
-                setOpportunities([newOpportunity, ...opportunities])
-              }
-              
-              setModalOpen(false)
-              setEditingOpportunity(null)
-              setFormData({
-                title: '',
-                company: '',
-                type: 'Job shadows',
-                tags: [],
-                location: '',
-                pay: '',
-                duration: '',
-                spots: 0,
-                deadline: '',
-                isPaid: false,
-              })
-            }} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
                 <input
@@ -504,7 +440,7 @@ export default function OpportunitiesPage() {
                 <select
                   required
                   value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as Opportunity['type'] })}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="Job shadows">Job shadows</option>
@@ -523,8 +459,8 @@ export default function OpportunitiesPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Application Link</label>
                 <input
                   type="url"
-                  value={formData.applicationLink}
-                  onChange={(e) => setFormData({ ...formData, applicationLink: e.target.value })}
+                  value={formData.application_link}
+                  onChange={(e) => setFormData({ ...formData, application_link: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="https://example.com/apply"
                 />
@@ -573,8 +509,8 @@ export default function OpportunitiesPage() {
                   <input
                     type="number"
                     min="0"
-                    value={formData.spots || ''}
-                    onChange={(e) => setFormData({ ...formData, spots: parseInt(e.target.value) || 0 })}
+                    value={formData.spots ?? ''}
+                    onChange={(e) => setFormData({ ...formData, spots: e.target.value ? parseInt(e.target.value) : null })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., 30"
                   />
@@ -593,6 +529,19 @@ export default function OpportunitiesPage() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">None</option>
+                  <option value="New">New</option>
+                  <option value="Closes Soon">Closes Soon</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tags (comma-separated)</label>
                 <input
                   type="text"
@@ -606,26 +555,39 @@ export default function OpportunitiesPage() {
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  id="isPaid"
-                  checked={formData.isPaid}
-                  onChange={(e) => setFormData({ ...formData, isPaid: e.target.checked })}
+                  id="is_paid"
+                  checked={formData.is_paid}
+                  onChange={(e) => setFormData({ ...formData, is_paid: e.target.checked })}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <label htmlFor="isPaid" className="text-sm font-medium text-gray-700">
+                <label htmlFor="is_paid" className="text-sm font-medium text-gray-700">
                   This is a paid opportunity
                 </label>
               </div>
 
               <div className="flex gap-3 pt-4">
-                <Button type="submit" className="flex-1">
+                <Button type="submit" className="flex-1" disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {editingOpportunity ? 'Update Opportunity' : 'Add Opportunity'}
                 </Button>
+                {editingOpportunity && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="text-red-600 border-red-300 hover:bg-red-50"
+                    onClick={handleDelete}
+                    disabled={saving}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => {
                     setModalOpen(false)
                     setEditingOpportunity(null)
+                    setFormData(emptyForm)
                   }}
                 >
                   Cancel
