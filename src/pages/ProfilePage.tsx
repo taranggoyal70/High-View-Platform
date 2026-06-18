@@ -8,6 +8,7 @@ import {
 import { Button } from '../components/ui/button'
 import { useSettings } from '../contexts/SettingsContext'
 import { authService } from '../services/authService'
+import { getStudentProfile, saveStudentProfile } from '../services/supabaseService'
 
 // ── Shared Toggle ─────────────────────────────────────────────────────────
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -50,29 +51,57 @@ const DEFAULT_STUDENT_PROFILE: StudentProfileData = {
 
 const CLASS_YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'Graduate']
 
-function loadStudentProfile(email?: string): StudentProfileData {
-  try {
-    // Try user-specific key first, fall back to legacy generic key
-    const raw = (email ? localStorage.getItem(`studentProfileData_${email}`) : null)
-      ?? localStorage.getItem('studentProfileData')
-    return raw ? { ...DEFAULT_STUDENT_PROFILE, ...JSON.parse(raw) } : DEFAULT_STUDENT_PROFILE
-  } catch {
-    return DEFAULT_STUDENT_PROFILE
-  }
-}
-
 // ── Student Profile Card ──────────────────────────────────────────────────
 function StudentProfileSection({ user }: { user: any }) {
-  const profileKey = `studentProfileData_${user.email}`
-  const [profile, setProfile] = useState<StudentProfileData>(() => loadStudentProfile(user.email))
+  const [profile, setProfile] = useState<StudentProfileData>(DEFAULT_STUDENT_PROFILE)
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<StudentProfileData>(profile)
+  const [draft, setDraft] = useState<StudentProfileData>(DEFAULT_STUDENT_PROFILE)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!user?.id) return
+    getStudentProfile(user.id).then(data => {
+      if (data) {
+        // map class_year → classYear for local state
+        const mapped: StudentProfileData = {
+          bio: data.bio ?? '',
+          school: data.school ?? '',
+          major: data.major ?? '',
+          classYear: (data as any).class_year ?? '',
+          gpa: data.gpa ?? '',
+          location: data.location ?? '',
+          phone: data.phone ?? '',
+          linkedin: data.linkedin ?? '',
+          github: data.github ?? '',
+          skills: data.skills ?? '',
+        }
+        setProfile(mapped)
+      }
+    })
+  }, [user?.id])
 
   const openEdit = () => { setDraft(profile); setEditing(true) }
   const closeEdit = () => setEditing(false)
-  const saveEdit = () => {
-    setProfile(draft)
-    localStorage.setItem(profileKey, JSON.stringify(draft))
+  const saveEdit = async () => {
+    setSaving(true)
+    try {
+      await saveStudentProfile(user.id, {
+        bio: draft.bio,
+        school: draft.school,
+        major: draft.major,
+        class_year: draft.classYear,
+        gpa: draft.gpa,
+        location: draft.location,
+        phone: draft.phone,
+        linkedin: draft.linkedin,
+        github: draft.github,
+        skills: draft.skills,
+        job_title: '',
+      } as any)
+      setProfile(draft)
+    } finally {
+      setSaving(false)
+    }
     setEditing(false)
   }
 
@@ -376,7 +405,7 @@ function StudentProfileSection({ user }: { user: any }) {
               </div>
 
               <div className="flex gap-3 mt-6">
-                <Button className="flex-1" onClick={saveEdit}>Save Changes</Button>
+                <Button className="flex-1" onClick={saveEdit} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</Button>
                 <Button variant="outline" className="flex-1" onClick={closeEdit}>Cancel</Button>
               </div>
             </motion.div>

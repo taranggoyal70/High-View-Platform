@@ -12,15 +12,9 @@ export async function getStudent(record_id: string): Promise<any> {
 
 // GET all students
 export async function getAllStudents(): Promise<any> {
-  const recordIds = ['EDU-001', 'EDU-002', 'EDU-003']
-  const results = await Promise.all(
-    recordIds.map(id =>
-      fetch(`${API_BASE}/students?record_id=${id}`, { headers: { 'x-api-key': API_KEY } })
-        .then(res => (res.ok ? res.json() : null))
-        .catch(() => null)
-    )
-  )
-  return results.filter(Boolean)
+  const res = await fetch(`${API_BASE}/students`, { headers: { 'x-api-key': API_KEY } })
+  if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
+  return res.json()
 }
 
 // POST (create student)

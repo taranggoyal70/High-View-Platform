@@ -20,6 +20,9 @@ import PrivacyPage from './pages/PrivacyPage'
 import ProfilePage from './pages/ProfilePage'
 import AttendanceTrackingPage from './pages/AttendanceTrackingPage'
 import AddOpportunityPage from './pages/AddOpportunityPage'
+import MilestonesPage from './pages/MilestonesPage'
+import ConnectionsPage from './pages/ConnectionsPage'
+import ResourceCenterPage from './pages/ResourceCenterPage'
 import NotFoundPage from './pages/NotFoundPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
@@ -64,6 +67,13 @@ function App() {
           </ProtectedRoute>
         } />
         <Route path="/explore" element={<OpportunitiesPage />} />
+        <Route path="/resources" element={<ResourceCenterPage />} />
+        <Route path="/milestones" element={<MilestonesPage />} />
+        <Route path="/connections" element={
+          <ProtectedRoute allowedRoles={['student']}>
+            <ConnectionsPage />
+          </ProtectedRoute>
+        } />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/sessions/:sessionId/attendance" element={

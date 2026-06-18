@@ -5,6 +5,7 @@ import { ArrowLeft, Brain, BookOpen, Calendar, Mail, GraduationCap, Clock, Penci
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 import { cohortStudents } from '../data/transformStudents'
+import { getProgressOverrides, saveProgressOverrides, getAdvisingNotes, addAdvisingNote } from '../services/supabaseService'
 
 interface StudentRecord {
   record_id: string
@@ -108,31 +109,35 @@ export default function StudentProfilePage() {
   const [overrides, setOverrides] = useState<ProgressOverride | null>(null)
   const [editValues, setEditValues] = useState<ProgressOverride>({ ai: 0, experiential: 0, sessionAttendance: 0 })
   const [selfProfile, setSelfProfile] = useState<StudentSelfProfile | null>(null)
+  const [advisingNotes, setAdvisingNotes] = useState<Array<{ id: string; staff_name: string; note: string; created_at: string }>>([])
+  const [newNote, setNewNote] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}')
-    setIsStaff(user?.role === 'staff')
+    setCurrentUser(user)
+    setIsStaff(user?.type === 'staff' || user?.type === 'admin')
 
-    // Use real student data from students.json
     const realStudent = cohortStudents.find(s => s.id === studentId)
-    if (realStudent) {
-      // Load any manual overrides from localStorage
-      const savedOverrides = localStorage.getItem(`progress_overrides_${studentId}`)
-      const parsed: ProgressOverride | null = savedOverrides ? JSON.parse(savedOverrides) : null
-      setOverrides(parsed)
+    if (!realStudent) { setStudent(null); setLoading(false); return }
 
-      // Transform to StudentRecord format
+    // Load overrides from Supabase (fall back to raw data if none)
+    getProgressOverrides(realStudent.id).then(parsed => {
+      const o = parsed ? { ai: parsed.ai_score ?? realStudent.ai, experiential: parsed.experiential_score ?? realStudent.experiential, sessionAttendance: parsed.session_attendance ?? realStudent.sessionAttendance } : null
+      if (o) setOverrides({ ai: o.ai, experiential: o.experiential, sessionAttendance: o.sessionAttendance })
+
       const studentRecord: StudentRecord = {
         student_id: realStudent.id,
         student_name: realStudent.name,
         student_email: realStudent.email,
         class_name: realStudent.major,
-        attendance: parsed?.sessionAttendance ?? realStudent.sessionAttendance,
-        engagement: parsed?.ai ?? realStudent.ai,
-        grade: parsed?.experiential ?? realStudent.experiential,
+        attendance: o?.sessionAttendance ?? realStudent.sessionAttendance,
+        engagement: o?.ai ?? realStudent.ai,
+        grade: o?.experiential ?? realStudent.experiential,
         teacher_name: 'HighView Staff',
         session_date: '2026-09-01',
-        photo_url: `https://ui-avatars.com/api/?name=${realStudent.name.replace(' ', '+')}&background=random`,
+        photo_url: '',
         department: realStudent.school,
         topic: '2026-27 College Cohort',
         speaking_time: realStudent.eventsAttended * 10,
@@ -140,31 +145,49 @@ export default function StudentProfilePage() {
       }
       setStudent(studentRecord)
       setEditValues({
-        ai: parsed?.ai ?? realStudent.ai,
-        experiential: parsed?.experiential ?? realStudent.experiential,
-        sessionAttendance: parsed?.sessionAttendance ?? realStudent.sessionAttendance,
+        ai: o?.ai ?? realStudent.ai,
+        experiential: o?.experiential ?? realStudent.experiential,
+        sessionAttendance: o?.sessionAttendance ?? realStudent.sessionAttendance,
       })
+      setLoading(false)
+    })
 
-      // Load student's self-created profile data (keyed by email)
-      const selfRaw = localStorage.getItem(`studentProfileData_${realStudent.email}`)
-      setSelfProfile(selfRaw ? JSON.parse(selfRaw) : null)
-    } else {
-      setStudent(null)
-    }
-    setLoading(false)
+    // Student self-profile loads once student has logged in and saved their profile
+    setSelfProfile(null)
+
+    // Load advising notes
+    getAdvisingNotes(realStudent.id).then(notes => {
+      setAdvisingNotes(notes.map(n => ({ id: n.id, staff_name: n.staff_name, note: n.note, created_at: n.created_at })))
+    })
   }, [studentId])
 
-  function saveProgressOverrides() {
-    if (!student) return
+  async function saveProgressOverridesHandler() {
+    if (!student || !studentId) return
     const clamped: ProgressOverride = {
       ai: Math.min(100, Math.max(0, editValues.ai)),
       experiential: Math.min(100, Math.max(0, editValues.experiential)),
       sessionAttendance: Math.min(100, Math.max(0, editValues.sessionAttendance)),
     }
-    localStorage.setItem(`progress_overrides_${studentId}`, JSON.stringify(clamped))
+    await saveProgressOverrides(studentId, currentUser?.id ?? '', {
+      ai_score: clamped.ai,
+      experiential_score: clamped.experiential,
+      session_attendance: clamped.sessionAttendance,
+    })
     setOverrides(clamped)
     setStudent(prev => prev ? { ...prev, engagement: clamped.ai, grade: clamped.experiential, attendance: clamped.sessionAttendance } : prev)
     setEditOpen(false)
+  }
+
+  async function handleAddNote() {
+    if (!newNote.trim() || !studentId) return
+    setSavingNote(true)
+    try {
+      const note = await addAdvisingNote(studentId, currentUser?.id ?? '', currentUser?.name ?? 'Staff', newNote.trim())
+      setAdvisingNotes(prev => [{ id: note.id, staff_name: note.staff_name, note: note.note, created_at: note.created_at }, ...prev])
+      setNewNote('')
+    } finally {
+      setSavingNote(false)
+    }
   }
 
   if (loading) {
@@ -332,7 +355,7 @@ export default function StudentProfilePage() {
                     />
                   </div>
                 </div>
-                <Button onClick={saveProgressOverrides} size="sm" className="mt-4 gap-2">
+                <Button onClick={saveProgressOverridesHandler} size="sm" className="mt-4 gap-2">
                   <Check className="h-4 w-4" /> Save Changes
                 </Button>
               </div>
@@ -487,6 +510,41 @@ export default function StudentProfilePage() {
               <p className="text-sm text-muted-foreground italic">This student has not filled out their profile yet.</p>
             )}
           </Card>
+
+          {/* Advising Notes (staff only) */}
+          {isStaff && (
+            <Card className="p-6 mb-6">
+              <h2 className="text-xl font-semibold mb-4">Advising Notes</h2>
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={newNote}
+                  onChange={e => setNewNote(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddNote()}
+                  placeholder="Add a note about this student…"
+                  className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <Button size="sm" onClick={handleAddNote} disabled={savingNote || !newNote.trim()}>
+                  {savingNote ? 'Saving…' : 'Add Note'}
+                </Button>
+              </div>
+              {advisingNotes.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">No advising notes yet.</p>
+              ) : (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {advisingNotes.map(n => (
+                    <div key={n.id} className="p-3 bg-muted/30 rounded-lg">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-muted-foreground">{n.staff_name}</span>
+                        <span className="text-xs text-muted-foreground">{new Date(n.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-sm">{n.note}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
 
           {/* Session Details */}
           <Card className="overflow-hidden">

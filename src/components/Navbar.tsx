@@ -7,7 +7,10 @@ import { useSettings } from '../contexts/SettingsContext'
 
 const studentNavItems = [
   { name: 'Home', href: '/' },
-  { name: 'Experiential Learning Opportunities', href: '/explore' },
+  { name: 'Milestones', href: '/milestones' },
+  { name: 'Connections', href: '/connections' },
+  { name: 'Opportunities', href: '/explore' },
+  { name: 'Resources', href: '/resources' },
   { name: 'Courses', href: '/courses' },
   { name: 'Sessions', href: '/sessions' },
 ]
@@ -15,8 +18,9 @@ const studentNavItems = [
 const staffNavItems = [
   { name: 'Home', href: '/' },
   { name: 'Cohort', href: '/cohort' },
-  { name: 'Experiential Learning Opportunities', href: '/explore' },
-  { name: 'Courses', href: '/courses' },
+  { name: 'Milestones', href: '/milestones' },
+  { name: 'Opportunities', href: '/explore' },
+  { name: 'Resources', href: '/resources' },
   { name: 'Sessions', href: '/sessions' },
 ]
 
