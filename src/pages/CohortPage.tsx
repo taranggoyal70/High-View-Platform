@@ -305,6 +305,22 @@ export default function CohortPage() {
     }
   }
 
+  const exportCSV = () => {
+    const headers = ['Name', 'School', 'Year', 'Major', 'Email', 'Status', 'Attendance %', 'Engagement Score', 'Events Attended']
+    const rows = STUDENTS.map(s => [
+      s.name, s.school, s.year, s.major, s.email, s.status,
+      s.sessionAttendance, s.ai, s.eventsAttended
+    ])
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'cohort-report.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="container mx-auto max-w-5xl">
@@ -338,7 +354,7 @@ export default function CohortPage() {
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
-              <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+              <Button onClick={exportCSV} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
                 <Download className="h-4 w-4" />
                 Export report
               </Button>

@@ -88,20 +88,11 @@ export function transformToCohortStudent(student: RealStudent): CohortStudent {
     major: student.major,
     note: student.gpa >= 3.5 ? 'High performer' : '',
     eventsAttended: Math.floor(student.sessionsAttended * 0.6),
-    applications: Math.floor(Math.random() * 5),
+    applications: Math.floor(student.sessionsAttended * 0.2),
     mentorSessions: Math.floor(student.sessionsAttended * 0.4),
-    jobShadows: Math.floor(Math.random() * 3),
-    opportunities: [
-      { title: 'Curated Connections — Spring', subtitle: 'Networking • Apr 4' },
-      { title: 'Crocs Micro-Internship', subtitle: 'Marketing • Closes Apr 15' }
-    ],
-    staffNotes: [
-      { 
-        text: `Enrolled in ${student.cohort}. Major: ${student.major}`, 
-        date: student.enrollmentDate, 
-        author: 'System' 
-      }
-    ]
+    jobShadows: Math.floor(student.sessionsAttended * 0.12),
+    opportunities: [],
+    staffNotes: []
   }
 }
 

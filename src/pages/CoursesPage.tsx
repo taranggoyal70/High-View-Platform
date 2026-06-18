@@ -7,6 +7,8 @@ import { SemesterSelector } from '../components/SemesterSelector'
 import { useSemester } from '../contexts/SemesterContext'
 import { getStatsBySemester } from '../data/semesterData'
 import { realStudents } from '../data/transformStudents'
+import { supabase } from '../lib/supabase'
+import { getMyCourseRegistrations, setCourseRegistration } from '../services/supabaseService'
 import {
   PieChart as RePieChart,
   Pie,
@@ -97,34 +99,44 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Data Engineering': 'bg-emerald-100 text-emerald-700',
 }
 
-const LS_REGISTRATIONS = 'studentCourseRegistrations'
-
-function getRegistrations(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(LS_REGISTRATIONS) || '[]')
-  } catch {
-    return []
-  }
-}
-
-function saveRegistrations(ids: string[]) {
-  localStorage.setItem(LS_REGISTRATIONS, JSON.stringify(ids))
-}
-
 // ── Student Courses View ───────────────────────────────────────────────────
 function StudentCoursesView() {
-  const [registrations, setRegistrations] = useState<string[]>(getRegistrations)
+  const [registrations, setRegistrations] = useState<string[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
+  const [loadingRegs, setLoadingRegs] = useState(true)
   const [tab, setTab] = useState<'all' | 'upcoming'>('all')
+
+  useEffect(() => {
+    async function loadRegs() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserId(user.id)
+        const regs = await getMyCourseRegistrations(user.id)
+        setRegistrations(regs)
+      }
+      setLoadingRegs(false)
+    }
+    loadRegs()
+  }, [])
 
   const myCourses = COURSE_CATALOG.filter(c => registrations.includes(c.id))
   const tableCourses = tab === 'all' ? COURSE_CATALOG : COURSE_CATALOG.filter(c => c.upcoming)
 
-  const toggle = (id: string) => {
-    setRegistrations(prev => {
-      const next = prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]
-      saveRegistrations(next)
-      return next
-    })
+  const toggle = async (id: string) => {
+    if (!userId) return
+    const enrolled = registrations.includes(id)
+    await setCourseRegistration(userId, id, !enrolled)
+    setRegistrations(prev =>
+      enrolled ? prev.filter(r => r !== id) : [...prev, id]
+    )
+  }
+
+  if (loadingRegs) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    )
   }
 
   return (

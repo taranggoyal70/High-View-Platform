@@ -399,3 +399,134 @@ export async function upsertApplication(userId: string, opportunityId: string, s
     }, { onConflict: 'user_id,opportunity_id' })
   if (error) throw new Error(error.message)
 }
+
+// ── Sessions ──────────────────────────────────────────────────────────────────
+
+export interface SessionRecord {
+  id: string
+  title: string
+  date: string
+  time: string
+  type: string
+  instructor: string
+  required_grades: string[]
+  created_at: string
+}
+
+export interface SessionRegistration {
+  id: string
+  session_id: string
+  user_id: string
+  student_name: string
+  registered_at: string
+}
+
+export async function getSessions(): Promise<SessionRecord[]> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('*')
+    .order('date', { ascending: true })
+  if (error || !data) return []
+  return data as SessionRecord[]
+}
+
+export async function createSession(session: Omit<SessionRecord, 'id' | 'created_at'>): Promise<SessionRecord> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .insert(session)
+    .select()
+    .single()
+  if (error || !data) throw new Error(error?.message ?? 'Failed to create session')
+  return data as SessionRecord
+}
+
+export async function updateSession(id: string, session: Partial<SessionRecord>): Promise<void> {
+  const { error } = await supabase.from('sessions').update(session).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  const { error } = await supabase.from('sessions').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function getSessionRegistrations(sessionId: string): Promise<SessionRegistration[]> {
+  const { data, error } = await supabase
+    .from('session_registrations')
+    .select('*')
+    .eq('session_id', sessionId)
+  if (error || !data) return []
+  return data as SessionRegistration[]
+}
+
+export async function registerForSession(userId: string, sessionId: string, studentName: string): Promise<void> {
+  const { error } = await supabase
+    .from('session_registrations')
+    .upsert({ user_id: userId, session_id: sessionId, student_name: studentName }, { onConflict: 'session_id,user_id' })
+  if (error) throw new Error(error.message)
+}
+
+export async function unregisterFromSession(userId: string, sessionId: string): Promise<void> {
+  const { error } = await supabase
+    .from('session_registrations')
+    .delete()
+    .eq('user_id', userId)
+    .eq('session_id', sessionId)
+  if (error) throw new Error(error.message)
+}
+
+export async function getMySessionRegistrations(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('session_registrations')
+    .select('session_id')
+    .eq('user_id', userId)
+  if (error || !data) return []
+  return data.map((r: any) => r.session_id)
+}
+
+export async function getSessionNoShows(sessionId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('session_no_shows')
+    .select('user_id')
+    .eq('session_id', sessionId)
+  if (error || !data) return []
+  return data.map((r: any) => r.user_id)
+}
+
+export async function toggleSessionNoShow(sessionId: string, userId: string, markedBy: string, isNoShow: boolean): Promise<void> {
+  if (isNoShow) {
+    await supabase.from('session_no_shows').delete().eq('session_id', sessionId).eq('user_id', userId)
+  } else {
+    const { error } = await supabase
+      .from('session_no_shows')
+      .upsert({ session_id: sessionId, user_id: userId, marked_by: markedBy }, { onConflict: 'session_id,user_id' })
+    if (error) throw new Error(error.message)
+  }
+}
+
+// ── Course Registrations ──────────────────────────────────────────────────────
+
+export async function getMyCourseRegistrations(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('course_registrations')
+    .select('course_id')
+    .eq('user_id', userId)
+  if (error || !data) return []
+  return data.map((r: any) => r.course_id)
+}
+
+export async function setCourseRegistration(userId: string, courseId: string, enrolled: boolean): Promise<void> {
+  if (enrolled) {
+    const { error } = await supabase
+      .from('course_registrations')
+      .upsert({ user_id: userId, course_id: courseId }, { onConflict: 'user_id,course_id' })
+    if (error) throw new Error(error.message)
+  } else {
+    const { error } = await supabase
+      .from('course_registrations')
+      .delete()
+      .eq('user_id', userId)
+      .eq('course_id', courseId)
+    if (error) throw new Error(error.message)
+  }
+}

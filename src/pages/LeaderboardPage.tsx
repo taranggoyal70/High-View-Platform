@@ -88,7 +88,7 @@ export default function LeaderboardPage() {
   }, [semesterStudents])
 
   // Sort leaderboard data based on selected column and direction
-  const mockLeaderboardData = useMemo(() => {
+  const sortedLeaderboardData = useMemo(() => {
     const sorted = [...baseLeaderboardData].sort((a, b) => {
       let aValue: number, bValue: number
       
@@ -135,7 +135,7 @@ export default function LeaderboardPage() {
     const topParticipation = [...semesterStudents].sort((a, b) => b.participationPoints - a.participationPoints)[0]
     
     // Find fastest improver - student with upward trend and highest engagement among trending up students
-    const improvingStudents = mockLeaderboardData.filter(s => s.trend === 'up')
+    const improvingStudents = sortedLeaderboardData.filter(s => s.trend === 'up')
     const fastestImprover = improvingStudents.length > 0 
       ? improvingStudents.sort((a, b) => b.engagementScore - a.engagementScore)[0]
       : null
@@ -146,7 +146,7 @@ export default function LeaderboardPage() {
       { category: 'Most Participation', student: topParticipation.name, score: `${topParticipation.participationPoints} pts`, icon: Users },
       { category: 'Fastest Improver', student: fastestImprover?.studentName || topEngagement.name, score: fastestImprover ? `${fastestImprover.engagementScore}% eng.` : `${topEngagement.engagementScore}% eng.`, icon: TrendingUp }
     ]
-  }, [semesterStudents, mockLeaderboardData])
+  }, [semesterStudents, sortedLeaderboardData])
 
   const getRankIcon = (rank: number) => {
     switch (rank) {
@@ -232,9 +232,9 @@ export default function LeaderboardPage() {
                 <div className="mb-4">
                   <Medal className="h-16 w-16 text-gray-400 mx-auto" />
                 </div>
-                <div className="text-2xl font-bold mb-1">{mockLeaderboardData[1].studentName}</div>
-                <div className="text-sm text-muted-foreground mb-3">{mockLeaderboardData[1].studentId}</div>
-                <div className="text-3xl font-bold text-gray-500">{mockLeaderboardData[1].totalPoints}</div>
+                <div className="text-2xl font-bold mb-1">{sortedLeaderboardData[1].studentName}</div>
+                <div className="text-sm text-muted-foreground mb-3">{sortedLeaderboardData[1].studentId}</div>
+                <div className="text-3xl font-bold text-gray-500">{sortedLeaderboardData[1].totalPoints}</div>
                 <div className="text-xs text-muted-foreground">points</div>
               </CardContent>
             </Card>
@@ -252,9 +252,9 @@ export default function LeaderboardPage() {
                 <div className="mb-4">
                   <Trophy className="h-20 w-20 text-yellow-500 mx-auto" />
                 </div>
-                <div className="text-2xl font-bold mb-1">{mockLeaderboardData[0].studentName}</div>
-                <div className="text-sm text-muted-foreground mb-3">{mockLeaderboardData[0].studentId}</div>
-                <div className="text-4xl font-bold text-yellow-600">{mockLeaderboardData[0].totalPoints}</div>
+                <div className="text-2xl font-bold mb-1">{sortedLeaderboardData[0].studentName}</div>
+                <div className="text-sm text-muted-foreground mb-3">{sortedLeaderboardData[0].studentId}</div>
+                <div className="text-4xl font-bold text-yellow-600">{sortedLeaderboardData[0].totalPoints}</div>
                 <div className="text-xs text-muted-foreground">points</div>
               </CardContent>
             </Card>
@@ -272,9 +272,9 @@ export default function LeaderboardPage() {
                 <div className="mb-4">
                   <Medal className="h-16 w-16 text-amber-600 mx-auto" />
                 </div>
-                <div className="text-2xl font-bold mb-1">{mockLeaderboardData[2].studentName}</div>
-                <div className="text-sm text-muted-foreground mb-3">{mockLeaderboardData[2].studentId}</div>
-                <div className="text-3xl font-bold text-amber-700">{mockLeaderboardData[2].totalPoints}</div>
+                <div className="text-2xl font-bold mb-1">{sortedLeaderboardData[2].studentName}</div>
+                <div className="text-sm text-muted-foreground mb-3">{sortedLeaderboardData[2].studentId}</div>
+                <div className="text-3xl font-bold text-amber-700">{sortedLeaderboardData[2].totalPoints}</div>
                 <div className="text-xs text-muted-foreground">points</div>
               </CardContent>
             </Card>
@@ -384,7 +384,7 @@ export default function LeaderboardPage() {
             </div>
 
             <div className="space-y-4">
-              {mockLeaderboardData.map((entry, index) => (
+              {sortedLeaderboardData.map((entry, index) => (
                 <motion.div
                   key={entry.studentId}
                   initial={{ opacity: 0, x: -20 }}
